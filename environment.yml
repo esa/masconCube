@@ -4,3 +4,4 @@ channels:
   - conda-forge
 dependencies:
   - python ~= 3.12.6
+  - numpy ~= 2.2.3

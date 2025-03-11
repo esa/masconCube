@@ -4,5 +4,9 @@ channels:
   - conda-forge
 dependencies:
   - python ~= 3.12.6
+  - numpy ~= 2.2.3
   # dev
   - pre-commit ~=4.1.0
+  - tetgen ~= 1.6.0
+  - pyvista ~= 0.44.2
+  - ipykernel ~= 6.29.5
