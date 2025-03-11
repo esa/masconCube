@@ -1,7 +1,12 @@
 name: masconcube
 channels:
-  - defaults
   - conda-forge
+  - nvidia
+  - pytorch
+  - defaults
 dependencies:
+  - nvidia::cudatoolkit = 11.3
   - python ~= 3.12.6
+  - pytorch::pytorch ~= 2.4.0
+  - pytorch::torchvision ~= 0.19.0
   - numpy ~= 2.2.3
