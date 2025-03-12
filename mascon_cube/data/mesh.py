@@ -2,12 +2,14 @@ import pickle as pk
 from pathlib import Path
 from typing import Union
 
+import lazy_import
 import numpy as np
 import pyvista as pv
-import tetgen
 import torch
 
 from mascon_cube.constants import GROUND_TRUTH_DIR, MESH_DIR
+
+tetgen = lazy_import.lazy_module("tetgen")
 
 
 def mesh_to_gt(

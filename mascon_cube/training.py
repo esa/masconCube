@@ -1,14 +1,16 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
+import lazy_import
 import torch
 from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
-from torch.utils.tensorboard import SummaryWriter
 
 from mascon_cube.constants import TENSORBOARD_DIR
 from mascon_cube.data.mascon_model import MasconModel
 from mascon_cube.models import MasconCube
+
+tensorboard = lazy_import.lazy_module("torch.utils.tensorboard")
 
 
 @dataclass
@@ -40,7 +42,7 @@ def training_loop(
     best_cube = deepcopy(cube)
     best_loss = float("inf")
     if config.use_tensorboard:
-        writer = SummaryWriter(log_dir=TENSORBOARD_DIR)
+        writer = tensorboard.SummaryWriter(log_dir=TENSORBOARD_DIR)
 
     for i in range(config.n_epochs):
         if (i % config.n_epochs_before_resampling) == 0:
