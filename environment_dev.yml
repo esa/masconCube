@@ -16,7 +16,7 @@ dependencies:
   - pre-commit ~=4.1.0
   - pyvista ~= 0.44.2
   - ipykernel ~= 6.29.5
-  - tensorboard
+  - tensorboard ~= 2.19.0
 
   - pip:
     - tetgen
