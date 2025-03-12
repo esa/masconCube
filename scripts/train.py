@@ -2,6 +2,7 @@ import torch
 from torch.optim.adam import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from mascon_cube.constants import OUTPUT_DIR
 from mascon_cube.data.mascon_model import get_mascon_model
 from mascon_cube.data.sampling import get_target_point_sampler
 from mascon_cube.losses import normalized_L1_loss
@@ -40,7 +41,7 @@ def main():
     trained_cube = training_loop(cube, gt, config)
 
     # Save the trained cube
-    torch.save(trained_cube, "trained_cube.pt")
+    torch.save(trained_cube, OUTPUT_DIR / "trained_cube.pt")
 
 
 if __name__ == "__main__":
