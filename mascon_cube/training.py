@@ -57,13 +57,10 @@ def training_loop(
                 target_points, ground_truth.coords, ground_truth.masses
             )
 
-        predicted = compute_acceleration(target_points, cube.coords, cube.weights)
+        predicted = compute_acceleration(
+            target_points, cube.coords, cube.weights + cube.uniform_base_mass
+        )
         loss = config.loss_fn(predicted, labels)
-
-        config.optimizer.zero_grad()
-        loss.backward()
-        config.optimizer.step()
-        config.scheduler.step(loss.item())
 
         if loss.item() < best_loss:
             best_loss = loss.item()
@@ -82,13 +79,20 @@ def training_loop(
                         log_config.val_dataset, ground_truth.coords, ground_truth.masses
                     )
                     val_predicted = compute_acceleration(
-                        log_config.val_dataset, cube.coords, cube.weights
+                        log_config.val_dataset,
+                        cube.coords,
+                        cube.weights + cube.uniform_base_mass,
                     )
                     val_loss = config.loss_fn(val_predicted, val_labels).item()
                     writer.add_scalar("Loss/val", val_loss, i)
             if i % log_config.draw_every_n_epochs == 0:
                 fig = plot_mascon_cube(cube)
                 writer.add_figure("Cube", fig, i)
+
+        config.optimizer.zero_grad()
+        loss.backward()
+        config.optimizer.step()
+        config.scheduler.step(loss.item())
 
     return best_cube
 

@@ -6,8 +6,8 @@ from mascon_cube.models import MasconCube
 
 def plot_mascon_cube(
     mascon_cube: MasconCube,
-    s: int = 1,
-    marker: str = ".",
+    s: int = 1.8,
+    marker: str = "s",
     cmap: str = "viridis",
     threshold: float = 1e-16,
 ):
@@ -25,7 +25,7 @@ def plot_mascon_cube(
     x = mascon_cube.coords[:, 0].cpu().numpy()
     y = mascon_cube.coords[:, 1].cpu().numpy()
     z = mascon_cube.coords[:, 2].cpu().numpy()
-    mass = mascon_cube.weights.detach().cpu().numpy()
+    mass = mascon_cube.weights.detach().cpu().numpy() + mascon_cube.uniform_base_mass
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
     ax.set_zlim([-1, 1])

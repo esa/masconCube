@@ -34,3 +34,4 @@ class MasconCube:
         self.coords = coords
         self.weights = weights
         self.device = device
+        self.uniform_base_mass = uniform_base_mass
