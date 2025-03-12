@@ -2,9 +2,10 @@ import torch
 from torch.optim.adam import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from mascon_cube.constants import OUTPUT_DIR
+from mascon_cube.constants import OUTPUT_DIR, VAL_DATASETS_DIR
 from mascon_cube.data.mascon_model import get_mascon_model
 from mascon_cube.data.sampling import get_target_point_sampler
+from mascon_cube.logs import LogConfig
 from mascon_cube.losses import normalized_L1_loss
 from mascon_cube.models import MasconCube
 from mascon_cube.training import TrainingConfig, training_loop
@@ -34,11 +35,15 @@ def main():
         data_sampler=data_sampler,
         optimizer=optimizer,
         scheduler=scheduler,
-        use_tensorboard=True,
     )
 
+    val_dataset = torch.load(VAL_DATASETS_DIR / "itokawa_lp_1000_spherical_0_2.pt").to(
+        device
+    )
+    log_config = LogConfig(val_dataset=val_dataset)
+
     # Train the cube
-    trained_cube = training_loop(cube, gt, config)
+    trained_cube = training_loop(cube, gt, config, log_config)
 
     # Save the trained cube
     torch.save(trained_cube, OUTPUT_DIR / "trained_cube.pt")

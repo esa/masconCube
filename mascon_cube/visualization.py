@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from mascon_cube.models import MasconCube
 
 
-def plot_mascon_sections(
+def plot_mascon_cube(
     mascon_cube: MasconCube,
     s: int = 1,
     marker: str = ".",

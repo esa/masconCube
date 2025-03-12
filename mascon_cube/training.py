@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Optional
 
 import lazy_import
 import torch
@@ -8,7 +9,9 @@ from torch.optim.optimizer import Optimizer
 
 from mascon_cube.constants import TENSORBOARD_DIR
 from mascon_cube.data.mascon_model import MasconModel
+from mascon_cube.logs import LogConfig
 from mascon_cube.models import MasconCube
+from mascon_cube.visualization import plot_mascon_cube
 
 tensorboard = lazy_import.lazy_module("torch.utils.tensorboard")
 
@@ -23,11 +26,13 @@ class TrainingConfig:
     data_sampler: callable
     optimizer: Optimizer
     scheduler: LRScheduler
-    use_tensorboard: bool = False
 
 
 def training_loop(
-    cube: MasconCube, ground_truth: MasconModel, config: TrainingConfig
+    cube: MasconCube,
+    ground_truth: MasconModel,
+    config: TrainingConfig,
+    log_config: Optional[LogConfig] = None,
 ) -> MasconCube:
     """Train the mascon cube to fit the ground truth
 
@@ -35,13 +40,14 @@ def training_loop(
         cube (MasconCube): MasconCube to train
         ground_truth (MasconModel): Ground truth to fit
         config (TrainingConfig): Training configuration
+        log_config (Optional[LogConfig], optional): Logging configuration. Defaults to None (no logging).
 
     Returns:
         MasconCube: The trained MasconCube
     """
     best_cube = deepcopy(cube)
     best_loss = float("inf")
-    if config.use_tensorboard:
+    if log_config is not None:
         writer = tensorboard.SummaryWriter(log_dir=TENSORBOARD_DIR)
 
     for i in range(config.n_epochs):
@@ -64,8 +70,25 @@ def training_loop(
             best_cube = deepcopy(cube)
 
         # Tensorboard logging
-        if config.use_tensorboard:
-            writer.add_scalar("Loss/train", loss.item(), i)
+        if log_config is not None:
+            if i % log_config.log_every_n_epochs == 0:
+                writer.add_scalar("Loss/train", loss.item(), i)
+            if (
+                i % log_config.val_every_n_epochs == 0
+                and log_config.val_dataset is not None
+            ):
+                with torch.no_grad():
+                    val_labels = compute_acceleration(
+                        log_config.val_dataset, ground_truth.coords, ground_truth.masses
+                    )
+                    val_predicted = compute_acceleration(
+                        log_config.val_dataset, cube.coords, cube.weights
+                    )
+                    val_loss = config.loss_fn(val_predicted, val_labels).item()
+                    writer.add_scalar("Loss/val", val_loss, i)
+            if i % log_config.draw_every_n_epochs == 0:
+                fig = plot_mascon_cube(cube)
+                writer.add_figure("Cube", fig, i)
 
     return best_cube
 
