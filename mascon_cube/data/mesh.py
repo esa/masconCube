@@ -5,9 +5,9 @@ from typing import Union
 import numpy as np
 import pyvista as pv
 import tetgen
+import torch
 
 from mascon_cube.constants import GROUND_TRUTH_DIR, MESH_DIR
-from mascon_cube.data.utils import get_mesh
 
 
 def mesh_to_gt(
@@ -87,3 +87,105 @@ def convert_mesh(
     mesh_points = mesh_points - offset
     with open(MESH_DIR / output_name, "wb") as file:
         pk.dump((mesh_points.tolist(), mesh_triangles), file)
+
+
+def unpack_triangle_mesh(
+    mesh_vertices: np.array, mesh_triangles: np.array, device
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Unpacks the encoded triangles from vertices and faces
+
+    Args:
+        mesh_vertices (np.array): Nx3 vertices
+        mesh_triangles (np.array): Vx3 indices of respectively three vertices
+
+    Returns:
+        tuple of torch.tensor: (first_vertices,second_vertices,third_vertices)
+    """
+    mesh_vertices = torch.tensor(mesh_vertices).float()
+    mesh_triangles = torch.tensor(mesh_triangles)
+
+    # Unpack vertices
+    v0 = torch.zeros([len(mesh_triangles), 3], device=device)
+    v1 = torch.zeros([len(mesh_triangles), 3], device=device)
+    v2 = torch.zeros([len(mesh_triangles), 3], device=device)
+    for idx, t in enumerate(mesh_triangles):
+        v0[idx] = mesh_vertices[t[0]]
+        v1[idx] = mesh_vertices[t[1]]
+        v2[idx] = mesh_vertices[t[2]]
+
+    return (v0, v1, v2)
+
+
+def is_outside_torch(points, triangles):
+    """Memory-efficient check if points are outside a 3D mesh."""
+    device = triangles[0].device
+    direction = torch.tensor([0.0, 0.0, 1.0], device=device)
+
+    v0, v1, v2 = triangles
+
+    batch_size = 50000  # Reduce further if OOM persists
+    total_points = points.shape[0]
+
+    counter = torch.zeros(total_points, device=device, dtype=torch.int32)
+
+    for i in range(0, total_points, batch_size):
+        end = min(i + batch_size, total_points)
+        counter[i:end] = rays_triangle_intersect_torch(
+            points[i:end], direction, v0, v1, v2
+        )
+
+    return (counter % 2) == 0
+
+
+def rays_triangle_intersect_torch(ray_o, ray_d, v0, v1, v2):
+    """Memory-efficient Möller–Trumbore intersection algorithm (vectorized)."""
+    edge1 = v1 - v0  # Shape (M, 3)
+    edge2 = v2 - v0  # Shape (M, 3)
+
+    h = torch.cross(ray_d[None, :], edge2, dim=-1)  # Shape (M, 3)
+    a = torch.sum(edge1 * h, dim=-1)  # Shape (M,)
+
+    mask = torch.abs(a) > 1e-7
+    f = torch.zeros_like(a)
+    f[mask] = 1.0 / a[mask]  # Avoid division by zero
+
+    s = ray_o[:, None, :] - v0  # Shape (N, M, 3)
+    u = torch.sum(s * h, dim=-1) * f  # Shape (N, M)
+
+    valid_u = (u >= 0.0) & (u <= 1.0)
+
+    # Fix: Ensure both tensors have shape (N, M, 3) before cross product
+    q = torch.cross(s, edge1[None, :, :], dim=-1)  # Shape (N, M, 3)
+
+    v = torch.sum(q * ray_d[None, None, :], dim=-1) * f  # Shape (N, M)
+    valid_v = (v >= 0.0) & ((u + v) <= 1.0)
+
+    t = torch.sum(q * edge2[None, :, :], dim=-1) * f  # Shape (N, M)
+    valid_t = t > 0.0
+
+    return (valid_u & valid_v & valid_t & mask).sum(dim=-1)
+
+
+def get_mesh(mesh_name: Union[str, Path]) -> tuple[np.ndarray, np.ndarray]:
+    """Get the mesh points and triangles from a mesh file
+
+    Args:
+        mesh_name (Union[str, Path]): The name of the mesh file or the path to the mesh file
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: The mesh points and triangles
+    """
+    if isinstance(mesh_name, str):
+        if Path(mesh_name).exists():
+            mesh_path = Path(mesh_name)
+        else:
+            mesh_path = MESH_DIR / f"{mesh_name}.pk"
+    else:
+        mesh_path = mesh_name
+    assert mesh_path.exists(), f"Mesh file {mesh_path} does not exist"
+
+    with open(mesh_path, "rb") as f:
+        mesh_points, mesh_triangles = pk.load(f)
+    mesh_points = np.array(mesh_points)
+    mesh_triangles = np.array(mesh_triangles)
+    return mesh_points, mesh_triangles

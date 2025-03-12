@@ -7,11 +7,17 @@ channels:
 dependencies:
   - nvidia::cudatoolkit = 11.3
   - python ~= 3.12.6
+  - pip
   - pytorch::pytorch
   - pytorch::torchvision
   - numpy ~= 2.2.3
+  - lazy_import
   # dev
   - pre-commit ~=4.1.0
-  - tetgen ~= 1.6.0
   - pyvista ~= 0.44.2
   - ipykernel ~= 6.29.5
+  - tensorboard
+
+  - pip:
+    - tetgen
+    - -e .
