@@ -11,6 +11,7 @@ class MasconCube:
         cube_side: int,
         asteroid_name: Optional[str] = None,
         device: Union[str, torch.device] = "cuda",
+        differential: bool = False,
     ):
         linspace = torch.linspace(-1, 1, cube_side)
         x, y, z = torch.meshgrid(linspace, linspace, linspace, indexing="ij")
@@ -35,3 +36,20 @@ class MasconCube:
         self.weights = weights
         self.device = device
         self.uniform_base_mass = uniform_base_mass
+        self.differential = differential
+        self._hparams = {
+            "cube_side": cube_side,
+            "asteroid_name": asteroid_name,
+            "differential": differential,
+        }
+
+    @property
+    def masses(self):
+        return (
+            self.weights
+            if not self.differential
+            else self.weights + self.uniform_base_mass
+        )
+
+    def get_hparams(self):
+        return self._hparams

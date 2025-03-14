@@ -35,8 +35,6 @@ def mesh_to_gt(
     grid = tgen.grid
 
     grid = grid.compute_cell_sizes(volume=True, area=False, length=False)
-    mascon_masses = grid["Volume"]
-    mascon_masses = mascon_masses / sum(mascon_masses)
     mascon_points_nu = np.array(grid.cell_centers().points)
     mascon_masses_nu = grid["Volume"]
     mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
@@ -191,3 +189,66 @@ def get_mesh(mesh_name: Union[str, Path]) -> tuple[np.ndarray, np.ndarray]:
     mesh_points = np.array(mesh_points)
     mesh_triangles = np.array(mesh_triangles)
     return mesh_points, mesh_triangles
+
+
+def points_in_tetrahedra_torch(
+    x: torch.Tensor, nodes: torch.Tensor, elem: torch.Tensor
+) -> torch.Tensor:
+    """
+    Find the tetrahedrons that contain each point in x
+
+    Args:
+        x (torch.Tensor): (L, 3) tensor, coordinates of all points
+        nodes (torch.Tensor): (M, 3) tensor, coordinates of all nodes
+        elem (torch.Tensor): (N, 4) tensor, indices of the nodes of each tetrahedron
+
+    Returns:
+        torch.Tensor: (L,) tensor, index of the tetrahedron that contains each point, or -1 if not found
+    """
+    assert (
+        x.device == nodes.device == elem.device
+    ), "All tensors must be on the same device"
+    device = x.device
+
+    # Move data to device
+    x = torch.as_tensor(x, dtype=torch.float32, device=device)
+    nodes = torch.as_tensor(nodes, dtype=torch.float32, device=device)
+    elem = torch.as_tensor(elem, dtype=torch.long, device=device)
+
+    L = x.shape[0]
+
+    # Get tetrahedron vertices (M, 3)
+    v0, v1, v2, v3 = (
+        nodes[elem[:, 0]],
+        nodes[elem[:, 1]],
+        nodes[elem[:, 2]],
+        nodes[elem[:, 3]],
+    )
+
+    # Compute transformation matrices (M, 3, 3)
+    T = torch.stack([v1 - v0, v2 - v0, v3 - v0], dim=-1)
+
+    # Precompute inverse transformation matrices (M, 3, 3)
+    T_inv = torch.linalg.inv(T)
+
+    # Initialize output with -1 (meaning "not found")
+    result = torch.full((L,), -1, dtype=torch.long, device=device)
+
+    # Compute barycentric coordinates for all points at once
+    b = x[:, None, :] - v0  # (L, M, 3)
+    lambdas = torch.einsum("mij, lmj -> lmi", T_inv, b)  # (L, M, 3)
+    bary_coords = torch.cat(
+        [lambdas, 1 - lambdas.sum(dim=2, keepdim=True)], dim=2
+    )  # (L, M, 4)
+
+    # Check which tetrahedron contains each point
+    inside = (bary_coords >= 0) & (bary_coords <= 1)  # (L, M, 4)
+    inside = inside.all(dim=2)  # (L, M)
+
+    # Find first valid tetrahedron index for each point
+    valid_tets = torch.argmax(inside.int(), dim=1)
+    valid_mask = inside.any(dim=1)  # (L,)
+
+    result[valid_mask] = valid_tets[valid_mask]  # Assign only valid results
+
+    return result
