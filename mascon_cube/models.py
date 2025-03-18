@@ -6,13 +6,32 @@ from mascon_cube.data.mesh import get_mesh, is_outside_torch, unpack_triangle_me
 
 
 class MasconCube:
+    """A class representing a mascon cube."""
+
     def __init__(
         self,
         cube_side: int,
         asteroid_name: Optional[str] = None,
         device: Union[str, torch.device] = "cuda",
         differential: bool = False,
+        normalize: bool = False,
+        quadratic: bool = False,
     ):
+        """Initialize the mascon cube.
+
+        Args:
+            cube_side (int): The side length of the cube.
+            asteroid_name (Optional[str], optional): The name of the asteroid.
+                If passed, the mascon cube will be generated inside the asteroid's mesh. Defaults to None.
+            device (Union[str, torch.device], optional): The device to use. Defaults to "cuda".
+            differential (bool, optional): if True, the uniform base mass is added to the weights. Defaults to False.
+            normalize (bool, optional): if True, the masses are normalized so that they sum to 1. Defaults to False.
+        """
+        if differential and quadratic:
+            raise ValueError(
+                "differential and quadratic cannot be True at the same time"
+            )
+
         linspace = torch.linspace(-1, 1, cube_side)
         x, y, z = torch.meshgrid(linspace, linspace, linspace, indexing="ij")
         x = x.reshape(-1, 1)
@@ -37,19 +56,26 @@ class MasconCube:
         self.device = device
         self.uniform_base_mass = uniform_base_mass
         self.differential = differential
-        self._hparams = {
-            "cube_side": cube_side,
-            "asteroid_name": asteroid_name,
-            "differential": differential,
-        }
+        self.normalize = normalize
+        self.quadratic = quadratic
 
     @property
-    def masses(self):
-        return (
-            self.weights
-            if not self.differential
-            else self.weights + self.uniform_base_mass
-        )
+    def masses(self) -> torch.Tensor:
+        """Return the masses of the mascon cube.
+        If differential is True, the uniform base mass is added to the weights.
+        If normalize is True, the masses are normalized so that they sum to 1.
+
+        Returns:
+            torch.Tensor: The masses of the mascon cube
+        """
+        result = self.weights
+        if self.quadratic:
+            result = result**2
+        if self.differential:
+            result = result + self.uniform_base_mass
+        if self.normalize:
+            result = result / result.sum()
+        return result
 
     def get_hparams(self):
         return self._hparams

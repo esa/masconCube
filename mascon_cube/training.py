@@ -3,18 +3,15 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Optional, Union
 
-import lazy_import
 import torch
 
 from mascon_cube import losses
 from mascon_cube.constants import TENSORBOARD_DIR
-from mascon_cube.data.mascon_model import MasconModel, get_mascon_model
+from mascon_cube.data.mascon_model import MasconModel
 from mascon_cube.data.sampling import get_target_point_sampler
-from mascon_cube.logs import LogConfig
+from mascon_cube.logs import LogConfig, SummaryWriter
 from mascon_cube.models import MasconCube
 from mascon_cube.visualization import plot_mascon_cube
-
-tensorboard = lazy_import.lazy_module("torch.utils.tensorboard")
 
 
 @dataclass
@@ -25,16 +22,18 @@ class TrainingConfig:
     cube_side: int
     n_epochs: int
     n_epochs_before_resampling: int
-    loss_fn: str
-    batch_size: int
-    sampling_method: str
-    sampling_min: float
-    sampling_max: float
-    lr: float = 1e-6
+    loss_fn: str = "normalized_l1_loss"
+    batch_size: int = 1000
+    sampling_method: str = "spherical"
+    sampling_min: float = 0.0
+    sampling_max: float = 1.0
+    lr: float = 1e-5
     scheduler_factor: float = 0.8
     scheduler_patience: int = 200
     scheduler_min_lr: float = 1e-8
     differential: bool = False
+    normalize: bool = True
+    quadratic: bool = False
 
 
 @dataclass
@@ -67,8 +66,10 @@ def training_loop(
         config.asteroid,
         device=device,
         differential=config.differential,
+        normalize=config.normalize,
+        quadratic=config.quadratic,
     )
-    ground_truth: MasconModel = get_mascon_model(config.asteroid, device=device)
+    ground_truth = MasconModel(config.asteroid, device=device)
     optimizer = torch.optim.Adam([cube.weights], lr=config.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -94,7 +95,7 @@ def training_loop(
             / config.asteroid
             / datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         )
-        writer = tensorboard.SummaryWriter(log_dir=log_dir)
+        writer = SummaryWriter(log_dir=log_dir)
     for i in range(config.n_epochs):
         if (i % config.n_epochs_before_resampling) == 0:
             target_points = data_sampler()
@@ -131,7 +132,7 @@ def training_loop(
             if val_config is not None and i % val_config.val_every_n_epochs == 0:
                 writer.add_scalar("Loss/val", val_loss, i)
             if i % log_config.draw_every_n_epochs == 0:
-                fig = plot_mascon_cube(cube)
+                fig = plot_mascon_cube(cube, range=(1e-5, 3e-5))
                 writer.add_figure("Cube", fig, i)
 
         optimizer.zero_grad()
@@ -140,8 +141,8 @@ def training_loop(
         scheduler.step(loss.item())
 
     if log_config is not None:
-        torch.save(best_cube, log_dir / "best_cube.pt")
         writer.add_hparams(asdict(config), {"best_loss": best_loss})
+        torch.save(best_cube, log_dir / "best_cube.pt")
         writer.close()
 
     return best_cube
