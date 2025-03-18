@@ -1,53 +1,72 @@
+from itertools import product
+
 import torch
-from torch.optim.adam import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from mascon_cube.constants import OUTPUT_DIR, VAL_DATASETS_DIR
-from mascon_cube.data.mascon_model import get_mascon_model
-from mascon_cube.data.sampling import get_target_point_sampler
+from mascon_cube.constants import VAL_DATASETS_DIR
 from mascon_cube.logs import LogConfig
-from mascon_cube.losses import normalized_L1_loss
-from mascon_cube.models import MasconCube
-from mascon_cube.training import TrainingConfig, training_loop
+from mascon_cube.training import TrainingConfig, ValidationConfig, training_loop
 
 
-def main():
+def multi_train(
+    asteroids: list[str],
+    cube_sides: list[int] = [100],
+    n_epochs: list[int] = [500],
+    n_epochs_before_resampling: list[int] = [10],
+    loss_fns: list[str] = ["normalized_l1_loss"],
+    batch_sizes: list[int] = [1000],
+    sampling_methods: list[str] = ["spherical"],
+    sampling_mins: list[float] = [0.5],
+    sampling_maxs: list[float] = [1.5],
+    lrs: list[float] = [1e-6],
+    scheduler_factors: list[float] = [0.8],
+    scheduler_patience: list[int] = [200],
+    scheduler_min_lrs: list[float] = [1e-8],
+    differentials: list[bool] = [False],
+    normalize: list[bool] = [True],
+    quadratic: list[bool] = [False],
+):
+    param_grid = product(
+        asteroids,
+        cube_sides,
+        n_epochs,
+        n_epochs_before_resampling,
+        loss_fns,
+        batch_sizes,
+        sampling_methods,
+        sampling_mins,
+        sampling_maxs,
+        lrs,
+        scheduler_factors,
+        scheduler_patience,
+        scheduler_min_lrs,
+        differentials,
+        normalize,
+        quadratic,
+    )
+    for params in param_grid:
+        config = TrainingConfig(*params)
+        train(config)
+
+
+def train(config):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    asteroid = "itokawa_lp"
-
-    cube = MasconCube(100, asteroid, device=device)
-    gt = get_mascon_model(asteroid, device=device)
-    data_sampler = get_target_point_sampler(
-        n=1000,
-        asteroid_mesh=asteroid,
-        method="spherical",
-        bounds=(0.5, 1.5),
-        device=device,
-    )
-    optimizer = Adam([cube.weights], lr=1e-6)
-    scheduler = ReduceLROnPlateau(optimizer, factor=0.8, patience=200, min_lr=1e-8)
-
-    # Training configuration
-    config = TrainingConfig(
-        n_epochs=500,
-        n_epochs_before_resampling=10,
-        loss_fn=normalized_L1_loss,
-        data_sampler=data_sampler,
-        optimizer=optimizer,
-        scheduler=scheduler,
-    )
 
     val_dataset = torch.load(VAL_DATASETS_DIR / "itokawa_lp_1000_spherical_0_2.pt").to(
         device
     )
-    log_config = LogConfig(val_dataset=val_dataset)
+    val_config = ValidationConfig(val_dataset=val_dataset, val_every_n_epochs=50)
+    log_config = LogConfig()
 
     # Train the cube
-    trained_cube = training_loop(cube, gt, config, log_config)
-
-    # Save the trained cube
-    torch.save(trained_cube, OUTPUT_DIR / "trained_cube.pt")
+    training_loop(config, val_config, log_config, device=device)
 
 
 if __name__ == "__main__":
-    main()
+    multi_train(
+        asteroids=["itokawa_lp"],
+        n_epochs=[1000],
+        batch_sizes=[100, 1000],
+        quadratic=[True, False],
+        lrs=[1e-5, 1e-4],
+        loss_fns=["normalized_l1_loss", "l1_loss"],
+    )
