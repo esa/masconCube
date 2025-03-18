@@ -26,6 +26,7 @@ def mesh_to_gt(
         mask_scalar (float): The scalar to apply to the mascon masses inside the mask
         save_image (bool, optional): Whether to save the image of the ground truth. Defaults to False.
     """
+    mesh_path = get_mesh_path(mesh_path)
     mesh_points, mesh_triangles = get_mesh(mesh_path)
     # Here we define the surface
     tgen = tetgen.TetGen(mesh_points, mesh_triangles)
@@ -53,7 +54,40 @@ def mesh_to_gt(
         plotter = pv.Plotter(off_screen=True)
         plotter.add_mesh(subgrid, "lightgrey", lighting=True, show_edges=True)
         plotter.add_mesh(grid, "r", "wireframe")
+        plotter.camera_position = [(1.08, -1.88, 1.25), (0, 0, 0), (0, 0, 1)]
+        plotter.camera.zoom(0.9)
         plotter.screenshot(GROUND_TRUTH_DIR / f"{mesh_path.stem}.png", return_img=False)
+        # plot slices - yz
+        pv.global_theme.allow_empty_mesh = True
+        plotter = pv.Plotter(off_screen=True)
+        subslice = subgrid.slice("x", origin=[0, 0, 0])
+        slice = grid.slice("x", origin=[0, 0, 0])
+        plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
+        plotter.add_mesh(slice, "r", "wireframe")
+        plotter.camera_position = "yz"
+        plotter.screenshot(
+            GROUND_TRUTH_DIR / f"{mesh_path.stem}_yz.png", return_img=False
+        )
+        # plot slices - xz
+        plotter = pv.Plotter(off_screen=True)
+        subslice = subgrid.slice("y", origin=[0, 0, 0])
+        slice = grid.slice("y", origin=[0, 0, 0])
+        plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
+        plotter.add_mesh(slice, "r", "wireframe")
+        plotter.camera_position = "xz"
+        plotter.screenshot(
+            GROUND_TRUTH_DIR / f"{mesh_path.stem}_xz.png", return_img=False
+        )
+        # plot slices - xy
+        plotter = pv.Plotter(off_screen=True)
+        subslice = subgrid.slice("z", origin=[0, 0, 0])
+        slice = grid.slice("z", origin=[0, 0, 0])
+        plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
+        plotter.add_mesh(slice, "r", "wireframe")
+        plotter.camera_position = "xy"
+        plotter.screenshot(
+            GROUND_TRUTH_DIR / f"{mesh_path.stem}_xy.png", return_img=False
+        )
 
 
 def convert_mesh(
@@ -175,6 +209,23 @@ def get_mesh(mesh_name: Union[str, Path]) -> tuple[np.ndarray, np.ndarray]:
     Returns:
         tuple[np.ndarray, np.ndarray]: The mesh points and triangles
     """
+    mesh_path = get_mesh_path(mesh_name)
+    with open(mesh_path, "rb") as f:
+        mesh_points, mesh_triangles = pk.load(f)
+    mesh_points = np.array(mesh_points)
+    mesh_triangles = np.array(mesh_triangles)
+    return mesh_points, mesh_triangles
+
+
+def get_mesh_path(mesh_name: Union[str, Path]) -> Path:
+    """Return a valid path to a mesh if it exists
+
+    Args:
+        mesh_name (Union[str, Path]): The name of the mesh file or the path to the mesh file
+
+    Returns:
+        Path: the mesh Path
+    """
     if isinstance(mesh_name, str):
         if Path(mesh_name).exists():
             mesh_path = Path(mesh_name)
@@ -183,12 +234,7 @@ def get_mesh(mesh_name: Union[str, Path]) -> tuple[np.ndarray, np.ndarray]:
     else:
         mesh_path = mesh_name
     assert mesh_path.exists(), f"Mesh file {mesh_path} does not exist"
-
-    with open(mesh_path, "rb") as f:
-        mesh_points, mesh_triangles = pk.load(f)
-    mesh_points = np.array(mesh_points)
-    mesh_triangles = np.array(mesh_triangles)
-    return mesh_points, mesh_triangles
+    return mesh_path
 
 
 def points_in_tetrahedra_torch(
