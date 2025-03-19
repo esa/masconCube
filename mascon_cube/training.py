@@ -1,3 +1,4 @@
+from abc import ABC
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -15,13 +16,12 @@ from mascon_cube.visualization import plot_mascon_cube
 
 
 @dataclass
-class TrainingConfig:
-    """Dataclass for training configuration"""
+class AbstractTrainingConfig(ABC):
+    """Abstract training config"""
 
     asteroid: str
-    cube_side: int
-    n_epochs: int
-    n_epochs_before_resampling: int
+    n_epochs: int = 1000
+    n_epochs_before_resampling: int = 10
     loss_fn: str = "normalized_l1_loss"
     batch_size: int = 1000
     sampling_method: str = "spherical"
@@ -31,6 +31,13 @@ class TrainingConfig:
     scheduler_factor: float = 0.8
     scheduler_patience: int = 200
     scheduler_min_lr: float = 1e-8
+
+
+@dataclass
+class CubeTrainingConfig(AbstractTrainingConfig):
+    """Dataclass for training configuration"""
+
+    cube_side: int = 100
     differential: bool = False
     normalize: bool = True
     quadratic: bool = False
@@ -45,7 +52,7 @@ class ValidationConfig:
 
 
 def training_loop(
-    config: TrainingConfig,
+    config: CubeTrainingConfig,
     val_config: Optional[ValidationConfig] = None,
     log_config: Optional[LogConfig] = None,
     device: Union[str, torch.device] = "cuda",
@@ -53,7 +60,7 @@ def training_loop(
     """Train the mascon cube to fit the ground truth
 
     Args:
-        config (TrainingConfig): Training configuration
+        config (CubeTrainingConfig): Training configuration
         val_config (Optional[ValidationConfig]): Validation configuration. Defaults to None (no validation).
         log_config (Optional[LogConfig]): Logging configuration. Defaults to None (no logging).
         device (Union[str, torch.device]): Device to use for training. Defaults to "cuda".
