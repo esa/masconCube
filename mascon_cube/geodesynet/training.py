@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Union
 
 import torch
+from tqdm import tqdm
 
 from mascon_cube import losses
 from mascon_cube.constants import TENSORBOARD_DIR
@@ -33,10 +34,24 @@ def geodesynet_training_loop(
     val_config: Optional[ValidationConfig] = None,
     log_config: Optional[LogConfig] = None,
     device: Union[str, torch.device] = "cuda",
-):
+    progressbar: bool = False,
+) -> GeodesyNet:
+    """Train the GeodesyNet to fit the ground truth
+
+    Args:
+        config (GeodesyNetTrainingConfig): Training configuration
+        val_config (Optional[ValidationConfig]): Validation configuration. Defaults to None (no validation).
+        log_config (Optional[LogConfig]): Logging configuration. Defaults to None (no logging).
+        device (Union[str, torch.device]): Device to use for training. Defaults to "cuda".
+        progressbar (bool, optional): If True show a progressbar on command line. Defaults to False.
+
+    Returns:
+        GeodesyNet: The trained GeodesyNet
+    """
     net = GeodesyNet(
         hidden_layers=config.hidden_layers, hidden_features=config.hidden_features
     )
+    net = net.to(device=device)
     ground_truth = MasconModel(config.asteroid, device=device)
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -65,7 +80,8 @@ def geodesynet_training_loop(
             / datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         )
         writer = SummaryWriter(log_dir=log_dir)
-    for i in range(config.n_epochs):
+    iterator = tqdm(range(config.n_epochs)) if progressbar else range(config.n_epochs)
+    for i in iterator:
         if (i % config.n_epochs_before_resampling) == 0:
             target_points = data_sampler()
             labels = compute_acceleration(
