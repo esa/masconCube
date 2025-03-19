@@ -30,7 +30,7 @@ class GeodesyNetTrainingConfig(AbstractTrainingConfig):
 
 def geodesynet_training_loop(
     config: GeodesyNetTrainingConfig,
-    val_config: ValidationConfig,
+    val_config: Optional[ValidationConfig] = None,
     log_config: Optional[LogConfig] = None,
     device: Union[str, torch.device] = "cuda",
 ):
