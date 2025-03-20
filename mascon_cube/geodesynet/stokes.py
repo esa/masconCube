@@ -1,5 +1,7 @@
 # ruff: noqa: E741 : Ignore naming problems from darioizzo/geodesyNets
 
+import math
+
 import numpy as np
 import torch
 import torchquad as tquad
@@ -32,9 +34,14 @@ def geodesynet2stokes(
     # We construct the vecotrized Legendre associated polynomials
     P = legendre_factory_torch(n=degree)
     # Declare an integrator
+    tquad.set_up_backend("torch", data_type="float32")
     quad = tquad.Trapezoid()
     M = quad.integrate(
-        mass, dim=3, N=n_quadrature, integration_domain=[[-1, 1], [-1, 1], [-1, 1]]
+        mass,
+        dim=3,
+        N=n_quadrature,
+        integration_domain=[[-1, 1], [-1, 1], [-1, 1]],
+        backend="torch",
     )
     stokesC_gann = np.zeros((degree + 1, degree + 1))
     for l in range(degree + 1):
@@ -179,12 +186,8 @@ def constant_factors(l, m):
         delta = 1
     else:
         delta = 0
-    retval = (2 - delta) * np.math.factorial(l - m) / np.math.factorial(l + m)
+    retval = (2 - delta) * math.factorial(l - m) / math.factorial(l + m)
     retval = retval * np.sqrt(
-        1
-        / (2 - delta)
-        / np.math.factorial(l - m)
-        / (2 * l + 1)
-        * np.math.factorial(l + m)
+        1 / (2 - delta) / math.factorial(l - m) / (2 * l + 1) * math.factorial(l + m)
     )
     return retval

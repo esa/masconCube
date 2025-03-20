@@ -2,6 +2,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, Union
 
 import torch
@@ -27,6 +28,7 @@ class GeodesyNetTrainingConfig(AbstractTrainingConfig):
     hidden_features: int = 100
     hidden_layers: int = 9
     n_quadrature: int = 300000
+    uniform_asteroid: Optional[Union[str, Path]] = None
 
 
 def geodesynet_training_loop(
@@ -48,11 +50,14 @@ def geodesynet_training_loop(
     Returns:
         GeodesyNet: The trained GeodesyNet
     """
+    do_differential_training = config.uniform_asteroid is not None
     net = GeodesyNet(
         hidden_layers=config.hidden_layers, hidden_features=config.hidden_features
     )
     net = net.to(device=device)
     ground_truth = MasconModel(config.asteroid, device=device)
+    if do_differential_training:
+        uniform_ground_truth = MasconModel(config.uniform_asteroid, device=device)
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -84,9 +89,20 @@ def geodesynet_training_loop(
     for i in iterator:
         if (i % config.n_epochs_before_resampling) == 0:
             target_points = data_sampler()
-            labels = compute_acceleration(
-                target_points, ground_truth.coords, ground_truth.masses
-            )
+            if do_differential_training:
+                labels = compute_acceleration(
+                    target_points, ground_truth.coords, ground_truth.masses
+                )
+            else:
+                labels_u = compute_acceleration(
+                    target_points,
+                    uniform_ground_truth.coords,
+                    uniform_ground_truth.masses,
+                )
+                labels_nu = compute_acceleration(
+                    target_points, ground_truth.coords, ground_truth.masses
+                )
+                labels = labels_nu - labels_u
 
         predicted = ACC_trap(target_points, net, n=config.n_quadrature, noise=0.0)
         # We learn the scaling constant (k in the paper)

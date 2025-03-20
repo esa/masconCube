@@ -1,8 +1,9 @@
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
+import seaborn as sns
 from matplotlib import pyplot as plt
+from matplotlib.colors import LogNorm
 
 from mascon_cube.models import MasconCube
 
@@ -14,7 +15,7 @@ def plot_mascon_cube(
     cmap: str = "viridis",
     threshold: float = 1e-16,
     range: Optional[tuple[float, float]] = None,
-):
+) -> plt.Figure:
     """
     plot the mascon model in 3D and in 2D sections (XY, XZ, YZ) where the color represents the mass
 
@@ -25,6 +26,9 @@ def plot_mascon_cube(
         cmap (str, optional): The colormap to use. Defaults to "viridis".
         threshold (float, optional): The threshold to select the points in the planes. Defaults to 1e-16.
         range (Optional[tuple[float, float]], optional): The range of the colormap. Defaults to None.
+
+    Returns:
+        plt.Figure: The figure with the 4 subplots (3D, XY, XZ, YZ).
     """
     fig = plt.figure(figsize=(10, 10), dpi=100, facecolor="white")
     ax = fig.add_subplot(221, projection="3d", aspect="equal")
@@ -104,19 +108,36 @@ def plot_mascon_cube(
     return fig
 
 
-def plot_mascon_model(
-    mesh_path: Union[Path, str],
-    s: int = 1.8,
-    marker: str = "s",
-    cmap: str = "viridis",
-    threshold: float = 1e-16,
-):
-    """Plot
+def stokes_heatmap(
+    pred: np.ndarray,
+    gt: np.ndarray,
+    title: str = "",
+    vmin: float = 1e-10,
+    vmax: float = 1e-4,
+    xlabel: str = "n",
+    ylabel: str = "m",
+) -> plt.Figure:
+    """Create a heatmap of the difference between the prediction and the ground truth.
 
     Args:
-        mesh_path (Union[Path, str]): _description_
-        s (int, optional): _description_. Defaults to 1.8.
-        marker (str, optional): _description_. Defaults to "s".
-        cmap (str, optional): _description_. Defaults to "viridis".
-        threshold (float, optional): _description_. Defaults to 1e-16.
+        pred (np.ndarray): NxM array of predictions
+        gt (np.ndarray): NxM array of ground truth
+        title (str, optional): plot title. Defaults to "".
+        vmin (float, optional): minimum value for the colormap. Defaults to 1e-10.
+        vmax (float, optional): maximum value for the colormap. Defaults to 1e-4.
+        xlabel (str, optional): label for the x axis. Defaults to "n".
+        ylabel (str, optional): label for the y axis. Defaults to "m".
+
+    Returns:
+        plt.Figure: The figure with the heatmap.
     """
+    fig, ax = plt.subplots()
+    diff = (pred - gt).abs()
+    sns.heatmap(
+        diff, annot=True, norm=LogNorm(), annot_kws={"fontsize": 8}, fmt=".1e", ax=ax
+    )
+    ax.collections[0].set_clim(vmin, vmax)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    return fig

@@ -17,14 +17,16 @@ def mesh_to_gt(
     mask_generator: callable,
     mask_scalar: float,
     save_image: bool = False,
+    save_uniform: bool = False,
 ) -> None:
-    """Generate the mascon model ground truth from a mesh file
+    """Generate the mascon model ground truth from a mesh file.
 
     Args:
-        # mesh_path (Union[Path, str]): Path to the mesh file or the name of the mesh file in the data/3dmeshes folder
-        mask_generator (callable): A function that takes the mascon points as input and returns a boolean mask
-        mask_scalar (float): The scalar to apply to the mascon masses inside the mask
+        # mesh_path (Union[Path, str]): Path to the mesh file or the name of the mesh file in the data/3dmeshes folder.
+        mask_generator (callable): A function that takes the mascon points as input and returns a boolean mask.
+        mask_scalar (float): The scalar to apply to the mascon masses inside the mask.
         save_image (bool, optional): Whether to save the image of the ground truth. Defaults to False.
+        save_uniform (bool, optional): Whether to save also the uniform ground truth. Defaults to False.
     """
     mesh_path = get_mesh_path(mesh_path)
     mesh_points, mesh_triangles = get_mesh(mesh_path)
@@ -39,6 +41,9 @@ def mesh_to_gt(
     mascon_points_nu = np.array(grid.cell_centers().points)
     mascon_masses_nu = grid["Volume"]
     mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
+    if save_uniform:
+        with open(GROUND_TRUTH_DIR / f"{mesh_path.stem}_uniform.pk", "wb") as file:
+            pk.dump((mascon_points_nu, mascon_masses_nu), file)
     mask = mask_generator(mascon_points_nu)
     mascon_masses_nu[mask] = mascon_masses_nu[mask] * mask_scalar
     mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
