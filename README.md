@@ -1,5 +1,7 @@
 # masconCube
 
+![image](https://github.com/user-attachments/assets/115f03f9-f65c-40c4-a357-b9cdc53eeee2)
+
 ## Installation
 
 ```bash
