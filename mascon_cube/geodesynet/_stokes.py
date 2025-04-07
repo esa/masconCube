@@ -7,6 +7,9 @@ import torch
 import torchquad as tquad
 
 from .models import GeodesyNet
+from typing import Optional, Union
+from pathlib import Path
+from mascon_cube.data.mesh import get_mesh, unpack_triangle_mesh, is_outside_torch
 
 
 def geodesynet2stokes(
@@ -14,6 +17,8 @@ def geodesynet2stokes(
     n_quadrature: int,
     r0: float,
     degree: int,
+    asteroid: Optional[Union[str, Path]] = None,
+    uniform_density: Optional[float] = None
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Computes the Stokes coefficients from a GeodesyNet.
 
@@ -22,14 +27,24 @@ def geodesynet2stokes(
         n_quadrature (int): Number of points to use for the evaluation.
         r0 (float): Characteristic radius (often mean equatorial radius) of the body.
         degree (int): Degree and order of spherical harmonics.
+        asteroid (Optional[Union[str, Path]], optional): Path to the asteroid model.
+            Used for differential training/models to add 1 to the density inside the asteroid.
 
     Returns:
         tuple[torch.Tensor, torch.Tensor]: Stokes coefficients C and S.
     """
-
+    if asteroid is not None:
+        assert uniform_density is not None, "Uniform density must be provided for differential training"
+        mesh_points, mesh_triangles = get_mesh(asteroid)
+        device = list(net.parameters())[0].device
+        triangles = unpack_triangle_mesh(mesh_points, mesh_triangles, device)
     # Integrand to compute the mass
     def mass(x):
-        return net(x)
+        result = net(x)
+        if asteroid is not None:
+            mask = ~is_outside_torch(x, triangles)
+            result[mask] += uniform_density
+        return result
 
     # We construct the vecotrized Legendre associated polynomials
     P = legendre_factory_torch(n=degree)

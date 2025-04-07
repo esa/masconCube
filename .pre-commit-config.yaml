@@ -9,16 +9,20 @@ repos:
     - id: ruff
       types_or: [ python, pyi ]
       args: ["--fix"]
+      exclude: "mascon_cube/geodesynet"
     # Sort imports
     - id: ruff
       name: ruff (imports)
       types_or: [ python, pyi ]
       args: ["check", "--select", "I", "--fix"]
+      exclude: "mascon_cube/geodesynet"
     # Run the formatter.
     - id: ruff-format
       types_or: [ python, pyi ]
+      exclude: "mascon_cube/geodesynet"
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
   hooks:
     - id: check-added-large-files
       args: ["--maxkb=512"]
+      exclude: "res"
