@@ -29,6 +29,9 @@ def mesh_to_gt(
         save_uniform (bool, optional): Whether to save also the uniform ground truth. Defaults to False.
     """
     mesh_path = get_mesh_path(mesh_path)
+    asteroid_name = mesh_path.stem
+    output_dir = GROUND_TRUTH_DIR / asteroid_name
+    output_dir.mkdir(exist_ok=True)
     mesh_points, mesh_triangles = get_mesh(mesh_path)
     # Here we define the surface
     tgen = tetgen.TetGen(mesh_points, mesh_triangles)
@@ -42,13 +45,13 @@ def mesh_to_gt(
     mascon_masses_nu = grid["Volume"]
     mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
     if save_uniform:
-        with open(GROUND_TRUTH_DIR / f"{mesh_path.stem}_uniform.pk", "wb") as file:
+        with open(output_dir / "mascon_model_uniform.pk", "wb") as file:
             pk.dump((mascon_points_nu, mascon_masses_nu), file)
     mask = mask_generator(mascon_points_nu)
     mascon_masses_nu[mask] = mascon_masses_nu[mask] * mask_scalar
     mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
 
-    with open(GROUND_TRUTH_DIR / mesh_path.name, "wb") as file:
+    with open(output_dir / "mascon_model.pk", "wb") as file:
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
@@ -61,7 +64,7 @@ def mesh_to_gt(
         plotter.add_mesh(grid, "r", "wireframe")
         plotter.camera_position = [(1.08, -1.88, 1.25), (0, 0, 0), (0, 0, 1)]
         plotter.camera.zoom(0.9)
-        plotter.screenshot(GROUND_TRUTH_DIR / f"{mesh_path.stem}.png", return_img=False)
+        plotter.screenshot(output_dir / "plot.png", return_img=False)
         # plot slices - yz
         pv.global_theme.allow_empty_mesh = True
         plotter = pv.Plotter(off_screen=True)
@@ -70,9 +73,7 @@ def mesh_to_gt(
         plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
         plotter.add_mesh(slice, "r", "wireframe")
         plotter.camera_position = "yz"
-        plotter.screenshot(
-            GROUND_TRUTH_DIR / f"{mesh_path.stem}_yz.png", return_img=False
-        )
+        plotter.screenshot(output_dir / "plot_yz.png", return_img=False)
         # plot slices - xz
         plotter = pv.Plotter(off_screen=True)
         subslice = subgrid.slice("y", origin=[0, 0, 0])
@@ -80,9 +81,7 @@ def mesh_to_gt(
         plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
         plotter.add_mesh(slice, "r", "wireframe")
         plotter.camera_position = "xz"
-        plotter.screenshot(
-            GROUND_TRUTH_DIR / f"{mesh_path.stem}_xz.png", return_img=False
-        )
+        plotter.screenshot(output_dir / "plot_xz.png", return_img=False)
         # plot slices - xy
         plotter = pv.Plotter(off_screen=True)
         subslice = subgrid.slice("z", origin=[0, 0, 0])
@@ -90,9 +89,7 @@ def mesh_to_gt(
         plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
         plotter.add_mesh(slice, "r", "wireframe")
         plotter.camera_position = "xy"
-        plotter.screenshot(
-            GROUND_TRUTH_DIR / f"{mesh_path.stem}_xy.png", return_img=False
-        )
+        plotter.screenshot(output_dir / "plot_xy.png", return_img=False)
 
 
 def convert_mesh(

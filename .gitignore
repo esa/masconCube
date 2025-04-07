@@ -1,6 +1,6 @@
 data/3dmeshes/*.pk
-data/ground_truths/*.pk
-data/ground_truths/*.png
+data/ground_truths/**/*.pk
+data/ground_truths/**/*.png
 data/output/*.pt
 *.egg-info
 tensorboard_logs
