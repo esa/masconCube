@@ -123,3 +123,24 @@ def cart2spherical(x: float, y: float, z: float) -> tuple[float, float, float]:
         phi += 2 * np.pi
 
     return r, theta, phi
+
+
+def combine_stokes_coefficients(
+    stokesC: np.ndarray,
+    stokesS: np.ndarray,
+) -> np.ndarray:
+    """Combines Stokes coefficients into a single array.
+
+    Args:
+        stokesC (np.ndarray): Stokes C coefficients.
+        stokesS (np.ndarray): Stokes S coefficients.
+
+    Returns:
+        np.ndarray: Combined Stokes coefficients.
+    """
+    if isinstance(stokesC, torch.Tensor):
+        stokesC = stokesC.cpu().numpy()
+    if isinstance(stokesS, torch.Tensor):
+        stokesS = stokesS.cpu().numpy()
+    stokesS = np.concatenate((stokesS.T[1:], np.zeros((1, len(stokesS)))))
+    return stokesC + stokesS

@@ -1,6 +1,7 @@
 import pickle as pk
+import shutil
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import lazy_import
 import numpy as np
@@ -14,23 +15,38 @@ tetgen = lazy_import.lazy_module("tetgen")
 
 def mesh_to_gt(
     mesh_path: Union[Path, str],
-    mask_generator: callable,
-    mask_scalar: float,
-    save_image: bool = False,
-    save_uniform: bool = False,
+    mask_generators: Union[list[callable], callable],
+    mask_scalars: Union[list[float], float],
+    save_image: bool = True,
+    save_uniform: bool = True,
+    save_mesh: bool = True,
+    output_name: Optional[str] = None,
 ) -> None:
     """Generate the mascon model ground truth from a mesh file.
 
     Args:
-        # mesh_path (Union[Path, str]): Path to the mesh file or the name of the mesh file in the data/3dmeshes folder.
-        mask_generator (callable): A function that takes the mascon points as input and returns a boolean mask.
-        mask_scalar (float): The scalar to apply to the mascon masses inside the mask.
-        save_image (bool, optional): Whether to save the image of the ground truth. Defaults to False.
-        save_uniform (bool, optional): Whether to save also the uniform ground truth. Defaults to False.
+        mesh_path (Union[Path, str]): Path to the mesh file or the name of the mesh file in the data/3dmeshes folder.
+        mask_generators (Union[list[callable], callable]): One or more functions that take a numpy array of points and
+            return a boolean mask. Each mask will create a different density region. They should not overlap.
+        mask_scalars (Union[list[float], float]): The scalar to multiply the mass of the points in the mask.
+            If a list is provided, it should have the same length as the number of masks.
+        save_image (bool, optional): Whether to save the image of the ground truth. Defaults to True.
+        save_uniform (bool, optional): Whether to save also the uniform ground truth. Defaults to True.
+        save_mesh (bool, optional): Whether to save the mesh. Defaults to True.
+        output_name (str, optional): The name of the output directory.
+            Defaults to None, in which case the mesh name is used.
     """
+    if not isinstance(mask_generators, (list, tuple)):
+        mask_generators = [mask_generators]
+    if not isinstance(mask_scalars, (list, tuple)):
+        mask_scalars = [mask_scalars]
+    assert len(mask_generators) == len(
+        mask_scalars
+    ), "mask_generator and mask_scalar must have the same length"
     mesh_path = get_mesh_path(mesh_path)
-    asteroid_name = mesh_path.stem
-    output_dir = GROUND_TRUTH_DIR / asteroid_name
+    if output_name is None:
+        output_name = mesh_path.stem
+    output_dir = GROUND_TRUTH_DIR / output_name
     output_dir.mkdir(exist_ok=True)
     mesh_points, mesh_triangles = get_mesh(mesh_path)
     # Here we define the surface
@@ -47,49 +63,123 @@ def mesh_to_gt(
     if save_uniform:
         with open(output_dir / "mascon_model_uniform.pk", "wb") as file:
             pk.dump((mascon_points_nu, mascon_masses_nu), file)
-    mask = mask_generator(mascon_points_nu)
-    mascon_masses_nu[mask] = mascon_masses_nu[mask] * mask_scalar
+    for mask_generator, mask_scalar in zip(mask_generators, mask_scalars):
+        mask = mask_generator(mascon_points_nu)
+        mascon_masses_nu[mask] = mascon_masses_nu[mask] * mask_scalar
     mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
+    mascon_densities = mascon_masses_nu / grid["Volume"]
+    grid.cell_data["mass"] = mascon_densities
 
     with open(output_dir / "mascon_model.pk", "wb") as file:
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
-        pv.start_xvfb()
-        pv.set_jupyter_backend("static")
-        cell_ind = mask.nonzero()[0]
-        subgrid = grid.extract_cells(cell_ind)
+        __plot_model(mask, grid, output_dir)
+
+    if save_mesh:
+        shutil.copy(mesh_path, output_dir / "mesh.pk")
+
+
+def mesh_to_gt_random_spots(
+    mesh_path: Union[Path, str],
+    frequency: int = 0.1,
+    seed: int = 42,
+    save_image: bool = True,
+    save_uniform: bool = True,
+    save_mesh: bool = True,
+    output_name: Optional[str] = None,
+) -> None:
+    """Generate the mascon model ground truth from a mesh file.
+
+    Args:
+        mesh_path (Union[Path, str]): Path to the mesh file or the name of the mesh file in the data/3dmeshes folder.
+        frequency (int, optional): The relative frequency of heterogeneities. Defaults to 0.1.
+        seed (int, optional): The seed for the random number generator. Defaults to 42.
+        save_image (bool, optional): Whether to save the image of the ground truth. Defaults to True.
+        save_uniform (bool, optional): Whether to save also the uniform ground truth. Defaults to True.
+        save_mesh (bool, optional): Whether to save the mesh. Defaults to True.
+        output_name (str, optional): The name of the output directory.
+            Defaults to None, in which case the mesh name is used.
+    """
+    mesh_path = get_mesh_path(mesh_path)
+    if output_name is None:
+        output_name = mesh_path.stem + "_spots"
+    output_dir = GROUND_TRUTH_DIR / f"{output_name}"
+    output_dir.mkdir(exist_ok=True)
+    mesh_points, mesh_triangles = get_mesh(mesh_path)
+    # Here we define the surface
+    tgen = tetgen.TetGen(mesh_points, mesh_triangles)
+    # Here we run the algorithm to mesh the inside with thetrahedrons
+    tgen.tetrahedralize()
+    # get all cell centroids
+    grid = tgen.grid
+
+    grid = grid.compute_cell_sizes(volume=True, area=False, length=False)
+    mascon_points_nu = np.array(grid.cell_centers().points)
+    mascon_masses_nu = grid["Volume"]
+    mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
+    if save_uniform:
+        with open(output_dir / "mascon_model_uniform.pk", "wb") as file:
+            pk.dump((mascon_points_nu, mascon_masses_nu), file)
+    n_mascons = len(mascon_masses_nu)
+    mask = np.zeros(n_mascons, dtype=bool)
+    np.random.seed(seed)
+    mask[np.random.choice(n_mascons, int(n_mascons * frequency), replace=False)] = True
+    values = np.random.uniform(0, 2, mask.shape)
+    mascon_masses_nu[mask] = mascon_masses_nu[mask] * values[mask]
+    mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
+    mascon_densities = mascon_masses_nu / grid["Volume"]
+    grid.cell_data["mass"] = mascon_densities
+
+    with open(output_dir / "mascon_model.pk", "wb") as file:
+        pk.dump((mascon_points_nu, mascon_masses_nu), file)
+
+    if save_image:
+        __plot_model(mask, grid, output_dir)
+
+    if save_mesh:
+        shutil.copy(mesh_path, output_dir / "mesh.pk")
+
+
+def __plot_model(mask: np.ndarray, grid: pv.UnstructuredGrid, output_dir: Path) -> None:
+    pv.start_xvfb()
+    pv.set_jupyter_backend("static")
+
+    vmin, vmax = 0, np.max(grid["mass"])
+
+    # Full 3D plot
+    plotter = pv.Plotter(off_screen=True)
+    plotter.add_mesh(
+        grid,
+        scalars="mass",
+        lighting=True,
+        show_edges=True,
+        scalar_bar_args={"title": "Density"},
+        clim=[vmin, vmax],
+    )
+    plotter.camera_position = [(1.08, -1.88, 1.25), (0, 0, 0), (0, 0, 1)]
+    plotter.camera.zoom(0.9)
+    plotter.screenshot(output_dir / "plot.png", return_img=False)
+
+    # Helper for slice plots
+    def plot_slice(orientation: str, filename: str, position: str):
         plotter = pv.Plotter(off_screen=True)
-        plotter.add_mesh(subgrid, "lightgrey", lighting=True, show_edges=True)
-        plotter.add_mesh(grid, "r", "wireframe")
-        plotter.camera_position = [(1.08, -1.88, 1.25), (0, 0, 0), (0, 0, 1)]
-        plotter.camera.zoom(0.9)
-        plotter.screenshot(output_dir / "plot.png", return_img=False)
-        # plot slices - yz
-        pv.global_theme.allow_empty_mesh = True
-        plotter = pv.Plotter(off_screen=True)
-        subslice = subgrid.slice("x", origin=[0, 0, 0])
-        slice = grid.slice("x", origin=[0, 0, 0])
-        plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
-        plotter.add_mesh(slice, "r", "wireframe")
-        plotter.camera_position = "yz"
-        plotter.screenshot(output_dir / "plot_yz.png", return_img=False)
-        # plot slices - xz
-        plotter = pv.Plotter(off_screen=True)
-        subslice = subgrid.slice("y", origin=[0, 0, 0])
-        slice = grid.slice("y", origin=[0, 0, 0])
-        plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
-        plotter.add_mesh(slice, "r", "wireframe")
-        plotter.camera_position = "xz"
-        plotter.screenshot(output_dir / "plot_xz.png", return_img=False)
-        # plot slices - xy
-        plotter = pv.Plotter(off_screen=True)
-        subslice = subgrid.slice("z", origin=[0, 0, 0])
-        slice = grid.slice("z", origin=[0, 0, 0])
-        plotter.add_mesh(subslice, "lightgrey", lighting=True, show_edges=True)
-        plotter.add_mesh(slice, "r", "wireframe")
-        plotter.camera_position = "xy"
-        plotter.screenshot(output_dir / "plot_xy.png", return_img=False)
+        slice_ = grid.slice(orientation, origin=[0, 0, 0])
+        plotter.add_mesh(
+            slice_,
+            scalars="mass",
+            lighting=True,
+            show_edges=True,
+            scalar_bar_args={"title": "Density"},
+            clim=[vmin, vmax],
+        )
+        plotter.camera_position = position
+        plotter.screenshot(output_dir / filename, return_img=False)
+
+    # Slice plots
+    plot_slice("x", "plot_yz.png", "yz")
+    plot_slice("y", "plot_xz.png", "xz")
+    plot_slice("z", "plot_xy.png", "xy")
 
 
 def convert_mesh(
@@ -231,8 +321,10 @@ def get_mesh_path(mesh_name: Union[str, Path]) -> Path:
     if isinstance(mesh_name, str):
         if Path(mesh_name).exists():
             mesh_path = Path(mesh_name)
-        else:
+        elif (MESH_DIR / f"{mesh_name}.pk").exists():
             mesh_path = MESH_DIR / f"{mesh_name}.pk"
+        else:
+            mesh_path = GROUND_TRUTH_DIR / mesh_name / "mesh.pk"
     else:
         mesh_path = mesh_name
     assert mesh_path.exists(), f"Mesh file {mesh_path} does not exist"

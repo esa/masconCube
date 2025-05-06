@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 from typing import Union
 
 import torch
 
-from mascon_cube.constants import VAL_DATASETS_DIR
+from mascon_cube.constants import GROUND_TRUTH_DIR, VAL_DATASETS_DIR
 from mascon_cube.data.sampling import get_target_point_sampler
 
 
@@ -20,4 +21,5 @@ def gen_validation_dataset(
 
 if __name__ == "__main__":
     torch.random.manual_seed(42)
-    gen_validation_dataset(1000, "itokawa_lp", "spherical", (0, 2))
+    for asteroid in [f.name for f in os.scandir(GROUND_TRUTH_DIR) if f.is_dir()]:
+        gen_validation_dataset(1000, asteroid, "spherical", (0, 2))

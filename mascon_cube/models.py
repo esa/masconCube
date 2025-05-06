@@ -13,9 +13,9 @@ class MasconCube:
         cube_side: int,
         asteroid_name: Optional[str] = None,
         device: Union[str, torch.device] = "cuda",
+        activation_function: str = "linear",
         differential: bool = False,
         normalize: bool = False,
-        quadratic: bool = False,
     ):
         """Initialize the mascon cube.
 
@@ -24,12 +24,14 @@ class MasconCube:
             asteroid_name (Optional[str], optional): The name of the asteroid.
                 If passed, the mascon cube will be generated inside the asteroid's mesh. Defaults to None.
             device (Union[str, torch.device], optional): The device to use. Defaults to "cuda".
+            activation_function (str, optional): The activation function to use for the weights.
+                Can be "softplus", "quadratic", "relu", or "linear". Defaults to "linear".
             differential (bool, optional): if True, the uniform base mass is added to the weights. Defaults to False.
             normalize (bool, optional): if True, the masses are normalized so that they sum to 1. Defaults to False.
         """
-        if differential and quadratic:
+        if differential and activation_function != "linear":
             raise ValueError(
-                "differential and quadratic cannot be True at the same time"
+                "differential training is only supported with linear activation function."
             )
 
         linspace = torch.linspace(-1, 1, cube_side)
@@ -57,10 +59,22 @@ class MasconCube:
         self.uniform_base_mass = uniform_base_mass
         self.differential = differential
         self.normalize = normalize
-        self.quadratic = quadratic
+        if activation_function == "softplus":
+            self.activation_function = torch.nn.Softplus(beta=500)
+        elif activation_function == "quadratic":
+            self.activation_function = lambda x: x**2
+        elif activation_function == "linear":
+            self.activation_function = lambda x: x
+        elif activation_function == "relu":
+            self.activation_function = torch.nn.ReLU()
+        else:
+            raise ValueError(
+                f"Unknown activation function: {activation_function}. "
+                "Choose from 'softplus', 'quadratic', or 'linear'."
+            )
 
     @property
-    def masses(self) -> torch.Tensor:
+    def masses(self, inference_mode: bool = False) -> torch.Tensor:
         """Return the masses of the mascon cube.
         If differential is True, the uniform base mass is added to the weights.
         If normalize is True, the masses are normalized so that they sum to 1.
@@ -69,8 +83,7 @@ class MasconCube:
             torch.Tensor: The masses of the mascon cube
         """
         result = self.weights
-        if self.quadratic:
-            result = result**2
+        result = self.activation_function(result)
         if self.differential:
             result = result + self.uniform_base_mass
         if self.normalize:

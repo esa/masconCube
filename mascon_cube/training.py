@@ -41,7 +41,7 @@ class CubeTrainingConfig(AbstractTrainingConfig):
     cube_side: int = 100
     differential: bool = False
     normalize: bool = True
-    quadratic: bool = False
+    activation_function: str = "linear"
 
 
 @dataclass
@@ -77,7 +77,7 @@ def training_loop(
         device=device,
         differential=config.differential,
         normalize=config.normalize,
-        quadratic=config.quadratic,
+        activation_function=config.activation_function,
     )
     ground_truth = MasconModel(config.asteroid, device=device)
     optimizer = torch.optim.Adam([cube.weights], lr=config.lr)

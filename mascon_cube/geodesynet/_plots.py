@@ -598,7 +598,7 @@ def plot_model_vs_mascon_rejection(model, encoding, points, masses=None, N=2500,
 
 
 def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=None, N=2500, crop_p=1e-2, s=100, save_path=None,
-                                  c=1., backcolor=[0.15, 0.15, 0.15], progressbar=False, offset=0.0, heatmap=False, mascon_alpha=0.05,
+                                  c=1., progressbar=False, offset=0.0, heatmap=False, mascon_alpha=0.05,
                                   add_shape_base_value=None, add_const_density=1.):
     """Plots both the mascon and model contours in one figure for direct comparison
 
@@ -613,7 +613,6 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
         s (int): size of the non rejected points visualization.
         save_path (str, optional): Pass to store plot, if none will display. Defaults to None.
         c (float, optional): Normalization constant. Defaults to 1.
-        backcolor (list, optional): Plot background color. Defaults to [0.15, 0.15, 0.15].
         progressbar (bool, optional): activates a progressbar. Defaults to False.
         offset (float): an offset to apply to the plane in the direction of the section normal
         heatmap (bool): determines if contour lines or heatmap are displayed
@@ -658,6 +657,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
         if add_shape_base_value is not None:
             outside_mask = torch.bitwise_not(
                 is_outside_torch(candidates, triangles))
+            rho_candidates *= torch.unsqueeze(outside_mask.float(), 1)
             rho_candidates += torch.unsqueeze(outside_mask.float()
                                               * add_const_density, 1)
 
@@ -679,8 +679,9 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     rho = torch.cat(rho, dim=0)[: N]  # concat and discard after N
 
     # levels = np.linspace(0, 2.7, 10)
-    levels = np.linspace(np.min(rho.cpu().detach().numpy()),
-                         np.max(rho.cpu().detach().numpy()), 10)
+    # levels = np.linspace(np.min(rho.cpu().detach().numpy()),
+    #                      np.max(rho.cpu().detach().numpy()), 10)
+    levels = np.arange(1e-16,np.percentile(rho.cpu().detach().numpy(), 99),.001)
 
     fig = plt.figure(figsize=(6, 6), dpi=100, facecolor='white')
     ax = fig.add_subplot(2, 2, 1, projection='3d')
@@ -689,7 +690,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     mascon_color = "green"
 
     # And we plot it
-    ax.scatter(x, y, z, color='k', s=normalized_masses, alpha=0.01)
+    # ax.scatter(x, y, z, color='k', s=normalized_masses, alpha=0.01)
     ax.scatter(points[:, 0].cpu(), points[:, 1].cpu(), points[:, 2].cpu(),
                marker='.', c=rejection_col, s=s*2, alpha=0.1)
     ax.set_xlim([-1, 1])
@@ -781,7 +782,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     if save_path is not None:
         plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
-    return ax
+    return fig
 
 
 def plot_model_mascon_acceleration(sample, model, encoding, mascon_points, mascon_masses, plane="XY",
@@ -1042,6 +1043,7 @@ def plot_model_contours(model, encoding, heatmap=False, section=np.array([0, 0, 
         outside_mask = np.invert(
             is_outside(newp, np.asarray(mesh_vertices),
                        np.asarray(mesh_triangles)))
+        rho *= torch.unsqueeze(torch.tensor(outside_mask).float(), 1)
         rho += torch.unsqueeze(torch.tensor(outside_mask).float()
                                * add_const_density, 1)
 
@@ -1059,7 +1061,7 @@ def plot_model_contours(model, encoding, heatmap=False, section=np.array([0, 0, 
         X, Y = Y, X
 
     if heatmap:
-        p = ax.contourf(X, Y, Z, cmap="YlOrRd", levels=levels)
+        p = ax.contourf(X, Y, Z, cmap="viridis", levels=levels)
         cb = plt.colorbar(p, ax=ax)
     else:
         cmap = mpl.cm.viridis
