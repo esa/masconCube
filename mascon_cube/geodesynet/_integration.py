@@ -317,7 +317,7 @@ def compute_integration_grid(N, noise=0.0, domain=[[-1, 1], [-1, 1], [-1, 1]]):
     h[1] = (grid_1d_y[1] - grid_1d_y[0])
     h[2] = (grid_1d_z[1] - grid_1d_z[0])
 
-    x, y, z = torch.meshgrid(grid_1d_x, grid_1d_y, grid_1d_z)
+    x, y, z = torch.meshgrid(grid_1d_x, grid_1d_y, grid_1d_z, indexing="ij")
     eval_points = torch.stack((x.flatten(), y.flatten(), z.flatten())).transpose(
         0, 1).to(os.environ["TORCH_DEVICE"])
 

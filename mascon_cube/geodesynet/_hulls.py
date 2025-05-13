@@ -164,7 +164,7 @@ def rays_triangle_intersect_torch(ray_o, ray_d, v0, v1, v2):
     edge1 = v1-v0
     edge2 = v2-v0
     ray_o = ray_o.repeat(V, 1)
-    h = torch.cross(ray_d.expand(V, 3), edge2)
+    h = torch.linalg.cross(ray_d.expand(V, 3), edge2)
 
     a = torch.einsum('bs,bs->b', edge1, h)
 
@@ -173,7 +173,7 @@ def rays_triangle_intersect_torch(ray_o, ray_d, v0, v1, v2):
     u = torch.einsum('bs,bs->b', s, h) * f
 
     crit1 = torch.logical_not(torch.logical_or(u < 0.0, u > 1.0))
-    q = torch.cross(s, edge1)
+    q = torch.linalg.cross(s, edge1)
 
     v = torch.einsum('bs,bs->b', q,
                      ray_d.expand(V, 3)) * f

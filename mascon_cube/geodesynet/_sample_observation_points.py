@@ -266,7 +266,7 @@ def _get_spherical_grid(N, radius=1.73205):
     offset = torch.pi / (N+2)  # Use an offset to avoid singularities at poles
     grid_1d = torch.linspace(
         offset, torch.pi-offset, N, device=os.environ["TORCH_DEVICE"])
-    phi, theta = torch.meshgrid(grid_1d, grid_1d)
+    phi, theta = torch.meshgrid(grid_1d, grid_1d, indexing='ij')
     x = radius * torch.sin(phi) * torch.cos(2*theta)
     y = radius * torch.sin(phi) * torch.sin(2*theta)
     z = radius * torch.cos(phi)

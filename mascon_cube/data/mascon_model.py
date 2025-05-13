@@ -1,3 +1,4 @@
+import copy
 import pickle as pk
 from pathlib import Path
 from typing import Union
@@ -45,7 +46,11 @@ class MasconModel:
         Returns:
             MasconModel: The model on the new device
         """
-        return MasconModel(self.coords.to(device), self.masses.to(device))
+        new_model = copy.deepcopy(self)
+        new_model.coords = self.coords.to(device)
+        new_model.masses = self.masses.to(device)
+        new_model.device = device
+        return new_model
 
     def to_cube(self, cube_side: int) -> MasconCube:
         """Convert the mascon model to a mascon cube

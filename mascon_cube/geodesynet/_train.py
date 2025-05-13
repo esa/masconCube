@@ -183,7 +183,7 @@ def _init_training_run(cfg, sample, lr, loss_fn, encoding, batch_size, target_sa
     # Setup optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.8, patience=200, min_lr=1e-6, verbose=True)
+        optimizer, factor=0.8, patience=200, min_lr=1e-6)
 
     # Here we set the method to sample the target points. We use a low precision mesh to exclude points inside the asteroid.
     sample_lp = sample[:-3]+"_lp.pk"

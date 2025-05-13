@@ -1,8 +1,21 @@
+import copy
 from typing import Optional, Union
 
 import torch
 
 from mascon_cube.data.mesh import get_mesh, is_outside_torch, unpack_triangle_mesh
+
+
+############### Define theese simple functions here because pickle cannot serialize classes with lambdas ###############
+def _linear(x):
+    return x
+
+
+def _quadratic(x):
+    return x**2
+
+
+#######################################################################################################################
 
 
 class MasconCube:
@@ -62,15 +75,14 @@ class MasconCube:
         if activation_function == "softplus":
             self.activation_function = torch.nn.Softplus(beta=500)
         elif activation_function == "quadratic":
-            self.activation_function = lambda x: x**2
+            self.activation_function = _quadratic
         elif activation_function == "linear":
-            self.activation_function = lambda x: x
+            self.activation_function = _linear
         elif activation_function == "relu":
             self.activation_function = torch.nn.ReLU()
         else:
             raise ValueError(
-                f"Unknown activation function: {activation_function}. "
-                "Choose from 'softplus', 'quadratic', or 'linear'."
+                f"Unknown activation function: {activation_function}. Choose from 'softplus', 'quadratic', or 'linear'."
             )
 
     @property
@@ -92,3 +104,18 @@ class MasconCube:
 
     def get_hparams(self):
         return self._hparams
+
+    def to(self, device: Union[str, torch.device]) -> "MasconCube":
+        """Move the model to a different device
+
+        Args:
+            device (Union[str, torch.device]): The device to move the model to
+
+        Returns:
+            MasconCube: The model on the new device
+        """
+        new_model = copy.deepcopy(self)
+        new_model.coords = self.coords.to(device)
+        new_model.weights = self.weights.to(device)
+        new_model.device = device
+        return new_model

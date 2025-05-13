@@ -25,8 +25,8 @@ def mascon2stokes(
         tuple[torch.Tensor, torch.Tensor]: Stokes coefficients C and S.
     """
     # Move data to CPU for compatibility with SciPy functions
-    mascon_points = mascon_points.cpu().numpy()
-    mascon_masses = mascon_masses.cpu().numpy()
+    mascon_points = mascon_points.detach().cpu().numpy()
+    mascon_masses = mascon_masses.detach().cpu().numpy()
 
     # Preallocate Stokes coefficients
     stokesC = np.zeros((order + 1, degree + 1))

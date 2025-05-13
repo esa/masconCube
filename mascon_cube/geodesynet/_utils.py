@@ -67,9 +67,17 @@ def unpack_triangle_mesh(mesh_vertices, mesh_triangles):
 def enableCUDA(device=0):
     """This function will set the default device to CUDA if possible. Call before declaring any variables!
     """
+    
     if torch.cuda.is_available():
         os.environ["TORCH_DEVICE"] = "cuda:" + str(device)
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="torch.set_default_tensor_type.*is deprecated",
+                category=UserWarning,
+                module="torch"
+            )
+            torch.set_default_tensor_type(torch.cuda.FloatTensor)
     else:
         warnings.warn(
             "Error enabling CUDA. cuda.is_available() returned False. CPU will be used.")

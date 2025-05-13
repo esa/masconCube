@@ -143,7 +143,7 @@ def training_loop(
             if val_config is not None and i % val_config.val_every_n_epochs == 0:
                 writer.add_scalar("Loss/val", val_loss, i)
             if i % log_config.draw_every_n_epochs == 0:
-                fig = plot_mascon_cube(cube, range=(1e-5, 3e-5))
+                fig = plot_mascon_cube(cube)
                 writer.add_figure("Cube", fig, i)
 
         optimizer.zero_grad()

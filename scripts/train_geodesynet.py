@@ -1,4 +1,5 @@
 import os
+from argparse import ArgumentParser
 from collections import deque
 
 import numpy as np
@@ -6,7 +7,7 @@ import torch
 from torch import nn
 
 from mascon_cube import geodesynet
-from mascon_cube.constants import GROUND_TRUTH_DIR
+from mascon_cube.constants import GROUND_TRUTH_DIR, OUTPUT_DIR
 from mascon_cube.data.mascon_model import MasconModel
 
 
@@ -31,12 +32,12 @@ def train_geodesynet(asteroid: str):
     weighted_average = deque([], maxlen=20)
     n_quadrature = 300000
     batch_size = 1000
-    n_epochs = 20000
+    n_epochs = 10000
     loss_fn = geodesynet.normalized_L1_loss
     mc_method = geodesynet.ACC_trap
     targets_point_sampler = geodesynet.get_target_point_sampler(
         batch_size,
-        limit_shape_to_asteroid=GROUND_TRUTH_DIR / asteroid / "mesh.pt",
+        limit_shape_to_asteroid=GROUND_TRUTH_DIR / asteroid / "mesh.pk",
         method="spherical",
         bounds=[0.0, 1.0],
     )
@@ -44,7 +45,7 @@ def train_geodesynet(asteroid: str):
     learning_rate = 1e-6
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.8, patience=200, min_lr=1e-6, verbose=True
+        optimizer, factor=0.8, patience=200, min_lr=1e-6
     )
     # And init the best results
     best_loss = np.inf
@@ -116,3 +117,25 @@ def train_geodesynet(asteroid: str):
     for layer in net.state_dict():
         net.state_dict()[layer] = best_model_state_dict[layer]
     return net, best_c
+
+
+if __name__ == "__main__":
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    parser = ArgumentParser()
+    parser.add_argument(
+        "asteroid",
+        type=str,
+        help="The name of the asteroid to train the model on.",
+    )
+    args = parser.parse_args()
+    net, best_c = train_geodesynet(args.asteroid)
+    # Save the model
+    asteroid = args.asteroid
+    output_path = OUTPUT_DIR / "geodesynet"
+    model_path = output_path / asteroid / "model.pt"
+    os.makedirs(model_path.parent, exist_ok=True)
+    torch.save(net.state_dict(), model_path)
+    # Save the best c
+    c_path = output_path / asteroid / "c.txt"
+    with open(c_path, "w") as f:
+        f.write(str(best_c.item()))

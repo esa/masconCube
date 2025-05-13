@@ -20,9 +20,20 @@ repos:
     - id: ruff-format
       types_or: [ python, pyi ]
       exclude: "mascon_cube/geodesynet"
+- repo: local
+  hooks:
+    - id: downscale-notebook-images
+      name: Downscale notebook images
+      entry: python .hooks/downscale_images_in_notebook.py
+      language: system
+      types: [jupyter]
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
   hooks:
     - id: check-added-large-files
+      name: Check files are < 512 kb (notebooks excluded)
       args: ["--maxkb=512"]
-      exclude: "res"
+      exclude: "notebooks"
+    - id: check-added-large-files
+      name: Check notebooks are < 1 Mb
+      args: ["--maxkb=1024"]

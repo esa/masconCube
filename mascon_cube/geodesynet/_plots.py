@@ -246,7 +246,7 @@ def plot_model_grid(model, encoding, N=20, bw=False, alpha=0.2, views_2d=True, c
     x = torch.linspace(-1, 1, N)
     y = torch.linspace(-1, 1, N)
     z = torch.linspace(-1, 1, N)
-    X, Y, Z = torch.meshgrid((x, y, z))
+    X, Y, Z = torch.meshgrid((x, y, z), indexing='ij')
 
     # We compute the density on the grid points (no gradient as its only for plotting)
     nn_inputs = torch.cat(
@@ -681,7 +681,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     # levels = np.linspace(0, 2.7, 10)
     # levels = np.linspace(np.min(rho.cpu().detach().numpy()),
     #                      np.max(rho.cpu().detach().numpy()), 10)
-    levels = np.arange(1e-16,np.percentile(rho.cpu().detach().numpy(), 99),.001)
+    levels = np.arange(np.min(rho.cpu().detach().numpy()), np.max(rho.cpu().detach().numpy())+.002,.001)
 
     fig = plt.figure(figsize=(6, 6), dpi=100, facecolor='white')
     ax = fig.add_subplot(2, 2, 1, projection='3d')
@@ -1043,6 +1043,7 @@ def plot_model_contours(model, encoding, heatmap=False, section=np.array([0, 0, 
         outside_mask = np.invert(
             is_outside(newp, np.asarray(mesh_vertices),
                        np.asarray(mesh_triangles)))
+        outside_mask = np.where(outside_mask, 1, np.nan)
         rho *= torch.unsqueeze(torch.tensor(outside_mask).float(), 1)
         rho += torch.unsqueeze(torch.tensor(outside_mask).float()
                                * add_const_density, 1)

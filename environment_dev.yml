@@ -20,6 +20,7 @@ dependencies:
   - pyvista ~= 0.44.2
   - ipykernel ~= 6.29.5
   - tensorboard ~= 2.19.0
+  - nbformat
 
   - pip:
     - tetgen ~= 0.6.5

@@ -6,7 +6,34 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from torch import Tensor
 
+from mascon_cube.constants import GROUND_TRUTH_DIR
 from mascon_cube.models import MasconCube
+
+
+def plot_asteroid(asteroid: str) -> plt.Figure:
+    """plot the thetraedrons model of the asteroid in 3D and in 2D sections (XY, XZ, YZ) where the color represents the
+        density.
+
+    Args:
+        asteroid (str): name of the asteroid. Must be an existing folder in `mascon_cube.constants.GROUND_TRUTH_DIR`
+
+    Returns:
+        plt.Figure: The figure with the 4 subplots (3D, XY, XZ, YZ).
+    """
+    img = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot.png")
+    img_xy = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot_xy.png")
+    img_xz = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot_xz.png")
+    img_yz = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot_yz.png")
+
+    # Concatenate horizontally
+    combined = np.vstack((np.hstack((img, img_xy)), np.hstack((img_xz, img_yz))))
+
+    # Show or save the result
+    fig = plt.figure(figsize=(10, 10))
+    plt.imshow(combined)
+    plt.title(asteroid)
+    plt.axis("off")
+    return fig
 
 
 def plot_mascon_cube(
@@ -185,8 +212,8 @@ def stokes_heatmap(
     title: str = "",
     vmin: float = 1e-4,
     vmax: float = 5e-1,
-    xlabel: str = "n",
-    ylabel: str = "m",
+    xlabel: str = r"$l$",
+    ylabel: str = r"$m$",
     relative: bool = True,
 ) -> plt.Figure:
     """Create a heatmap of the difference between the prediction and the ground truth.
@@ -224,13 +251,13 @@ def stokes_heatmap(
     )
     ax.collections[0].set_clim(vmin, vmax)
     ax.set_title(title, pad=15, loc="center")
-    ax.set_xlabel(xlabel + " [cos]")
-    ax.set_ylabel(ylabel + " [cos]")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax_top = ax.secondary_xaxis("top")
-    ax_top.set_xlabel(xlabel + " [sin]")
+    ax_top.set_xlabel(xlabel)
     ax_top.set_xticks(np.arange(1.5, pred.shape[1], 1), np.arange(1, pred.shape[1], 1))
     ax_right = ax.secondary_yaxis("right")
-    ax_right.set_ylabel(ylabel + " [sin]")
+    ax_right.set_ylabel(ylabel)
     ax_right.set_yticks(
         np.arange(0.5, pred.shape[0] - 1, 1), np.arange(0, pred.shape[0] - 1, 1)
     )
@@ -243,6 +270,24 @@ def stokes_heatmap(
         # Right border
         if i < diff.shape[0] - 1:
             ax.plot([i + 1, i + 1], [i, i + 1], color="white", linewidth=3)
+    plt.text(
+        1.01,
+        1.01,
+        r"$\tilde{S}_{m,l}$",
+        fontsize=14,
+        horizontalalignment="left",
+        verticalalignment="bottom",
+        transform=ax.transAxes,
+    )
+    plt.text(
+        -0.01,
+        -0.01,
+        r"$\tilde{C}_{m,l}$",
+        fontsize=14,
+        horizontalalignment="right",
+        verticalalignment="top",
+        transform=ax.transAxes,
+    )
     return fig
 
 
