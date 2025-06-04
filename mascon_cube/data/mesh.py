@@ -146,40 +146,59 @@ def __plot_model(mask: np.ndarray, grid: pv.UnstructuredGrid, output_dir: Path) 
     pv.set_jupyter_backend("static")
 
     vmin, vmax = 0, np.max(grid["mass"])
+    scalar_bar_args = {
+        "title": "Density",
+        "vertical": False,
+        "position_x": 0.3,
+        "position_y": 0.02,
+        "height": 0.1,
+        "width": 0.65,
+        "title_font_size": 32,
+        "label_font_size": 28,
+        "n_labels": 4,
+        "unconstrained_font_size": True,
+    }
 
-    # Full 3D plot
-    plotter = pv.Plotter(off_screen=True)
+    plotter = pv.Plotter(shape=(2, 2), window_size=(1200, 1200), off_screen=True)
+
+    # 3D plot (top-left)
+    plotter.subplot(0, 0)
     plotter.add_mesh(
         grid,
         scalars="mass",
-        lighting=True,
         show_edges=True,
-        scalar_bar_args={"title": "Density"},
         clim=[vmin, vmax],
+        scalar_bar_args=scalar_bar_args,
     )
-    plotter.camera_position = [(1.08, -1.88, 1.25), (0, 0, 0), (0, 0, 1)]
-    plotter.camera.zoom(0.9)
-    plotter.screenshot(output_dir / "plot.png", return_img=False)
+    plotter.view_vector((1, 1, 1))  # 45° elev, 45° azim is along (1,1,1) vector
+    plotter.add_axes(label_size=(0.2, 0.2), line_width=3)
+    plotter.add_text("3D View", position="upper_edge", font_size=18)
 
-    # Helper for slice plots
-    def plot_slice(orientation: str, filename: str, position: str):
-        plotter = pv.Plotter(off_screen=True)
-        slice_ = grid.slice(orientation, origin=[0, 0, 0])
+    # Frontal slice helpers
+    def add_frontal_slice(row, col, orientation, label, position):
+        plotter.subplot(row, col)
+        slice_ = grid.slice(orientation)
         plotter.add_mesh(
             slice_,
             scalars="mass",
-            lighting=True,
             show_edges=True,
-            scalar_bar_args={"title": "Density"},
             clim=[vmin, vmax],
+            show_scalar_bar=False,
         )
+        # plotter.show_grid()
+        plotter.add_axes(label_size=(0.2, 0.2), line_width=3)
         plotter.camera_position = position
-        plotter.screenshot(output_dir / filename, return_img=False)
+        plotter.add_text(label, position="upper_edge", font_size=18)
 
-    # Slice plots
-    plot_slice("x", "plot_yz.png", "yz")
-    plot_slice("y", "plot_xz.png", "xz")
-    plot_slice("z", "plot_xy.png", "xy")
+    # YZ slice (x=0) - look along +x
+    add_frontal_slice(0, 1, "x", "YZ Slice", "yz")
+    # XZ slice (y=0) - look along +y
+    add_frontal_slice(1, 0, "y", "XZ Slice", "xz")
+    # XY slice (z=0) - look along +z
+    add_frontal_slice(1, 1, "z", "XY Slice", "xy")
+
+    # plotter.link_views()  # Optional: link views for zoom/pan
+    plotter.screenshot(output_dir / "combined_plot.png", return_img=False)
 
 
 def convert_mesh(
