@@ -318,3 +318,86 @@ def stokes_boxplot(
     ax.set_xlabel("Relative error", fontsize=8)
     ax.tick_params(labelsize=8)
     return fig
+
+
+def _plot_ellipsoid(ax, a, b, c, **kwargs):
+    """Plot a wireframe ellipsoid."""
+    u, v = np.mgrid[0 : 2 * np.pi : 40j, 0 : np.pi : 40j]
+    X = a * np.cos(u) * np.sin(v)
+    Y = b * np.sin(u) * np.sin(v)
+    Z = c * np.cos(v)
+    ax.plot_wireframe(X, Y, Z, **kwargs)
+    return ax
+
+
+def plot_trajectory(
+    trajectory: np.ndarray,
+    rotated_trajectory: np.ndarray,
+    mascon_points: np.ndarray,
+    safety_coefficient: float = 1.4,
+    exit_radius: float = 2.0,
+):
+    """
+    Plot the body-frame and inertial-frame trajectories with asteroid model.
+    """
+    fig = plt.figure(figsize=(6, 6))
+    a = (
+        (np.max(mascon_points[:, 0]) - np.min(mascon_points[:, 0]))
+        / 2
+        * safety_coefficient
+    )
+    b = (
+        (np.max(mascon_points[:, 1]) - np.min(mascon_points[:, 1]))
+        / 2
+        * safety_coefficient
+    )
+    c = (
+        (np.max(mascon_points[:, 2]) - np.min(mascon_points[:, 2]))
+        / 2
+        * safety_coefficient
+    )
+    D = 3
+
+    def plot_panel(ax, traj, az, el, D, title):
+        ax.scatter3D(
+            mascon_points[:, 0],
+            mascon_points[:, 1],
+            mascon_points[:, 2],
+            alpha=0.05,
+            s=2,
+            c="k",
+        )
+        _plot_ellipsoid(ax, a, b, c, color="r", alpha=0.05)
+        _plot_ellipsoid(
+            ax, exit_radius, exit_radius, exit_radius, color="y", alpha=0.05
+        )
+        ax.plot3D(traj[:, 0], traj[:, 1], traj[:, 2])
+        ax.set_xlim(-D, D)
+        ax.set_ylim(-D, D)
+        ax.set_zlim(-D, D)
+        ax.view_init(az, el)
+        ax.set_title(title)
+        ax.set_xticks([-2, -1, 0, 1, 2])
+        ax.set_yticks([-2, -1, 0, 1, 2])
+        ax.set_zticks([])
+
+    # Body frame views
+    plot_panel(
+        fig.add_subplot(221, projection="3d"), trajectory, 0, 90, D, "body frame"
+    )
+    plot_panel(
+        fig.add_subplot(222, projection="3d"), trajectory, 90, 0, D, "body frame"
+    )
+    plot_panel(fig.add_subplot(223, projection="3d"), trajectory, 0, 0, D, "body frame")
+    # Inertial frame view
+    plot_panel(
+        fig.add_subplot(224, projection="3d"),
+        rotated_trajectory,
+        0,
+        90,
+        D,
+        "inertial frame",
+    )
+
+    plt.tight_layout()
+    return fig

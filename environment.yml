@@ -5,17 +5,21 @@ channels:
   - pytorch
   - defaults
 dependencies:
-  - nvidia::cudatoolkit = 11.3
   - python ~= 3.12.6
   - pip ~= 25.0.1
-  - pytorch::pytorch ~= 2.4.0
-  - pytorch::torchvision ~= 0.19.0
-  - numpy ~= 2.2.3
+  - numpy ~= 1.26.4  # numpy 2 is not compatible with cascade
+  - cascade ~= 0.1.9
   - lazy_import ~= 0.2.2
-  - scipy ~= 1.15.2
+  - scipy ~= 0.15.2
   - seaborn ~= 0.13.2
   - torchquad ~= 0.4.1
+  - pyvista ~= 0.45.2
+  - pykep ~= 2.6.4
 
   - pip:
-    - tetgen ~= 0.6.5
-    - -e --no-compile .
+    - tetgen == 0.6.4
+    - -e .
+    - torch
+    - torchvision
+    - torchaudio
+    - --extra-index-url https://download.pytorch.org/whl/cu118

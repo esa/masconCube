@@ -1,11 +1,14 @@
 from typing import Optional, Union
 
+import numpy as np
 import torch
 from torch import nn
 
 from mascon_cube import geodesynet
 from mascon_cube.data.mascon_model import MasconModel
 from mascon_cube.models import MasconCube
+
+ArrayLike = Union[np.ndarray, torch.Tensor]
 
 
 def compute_acceleration(
@@ -76,3 +79,37 @@ def relative_norm_distance(
     pred: torch.Tensor, gt: torch.Tensor, dim: int = 1, eps: float = 1e-8
 ) -> torch.Tensor:
     return norm_distance(pred, gt) / gt.norm(p=2, dim=1)
+
+
+def ade(pred: ArrayLike, gt: ArrayLike) -> float:
+    """Compute the Average Displacement Error (ADE) between two trajectories.
+
+    Args:
+        pred (ArrayLike): predicted trajectory
+        gt (ArrayLike): ground-truth trajectory
+
+    Returns:
+        float: Average Displacement Error (ADE)
+    """
+    if isinstance(pred, np.ndarray):
+        pred = torch.from_numpy(pred)
+    if isinstance(gt, np.ndarray):
+        gt = torch.from_numpy(gt)
+    return (pred - gt).norm(p=2, dim=1).mean().item()
+
+
+def fde(pred: ArrayLike, gt: ArrayLike) -> float:
+    """Compute the Final Displacement Error (FDE) between two trajectories.
+
+    Args:
+        pred (ArrayLike): predicted trajectory
+        gt (ArrayLike): ground-truth trajectory
+
+    Returns:
+        float: Final Displacement Error (FDE)
+    """
+    if isinstance(pred, np.ndarray):
+        pred = torch.from_numpy(pred)
+    if isinstance(gt, np.ndarray):
+        gt = torch.from_numpy(gt)
+    return (pred[-1] - gt[-1]).norm(p=2).item()
