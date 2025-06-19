@@ -20,13 +20,10 @@ repos:
     - id: ruff-format
       types_or: [ python, pyi ]
       exclude: "mascon_cube/geodesynet"
-- repo: local
+- repo: https://github.com/sasso-effe/notebooks-pre-commit
+  rev: v0.2.3
   hooks:
     - id: downscale-notebook-images
-      name: Downscale notebook images
-      entry: python .hooks/downscale_images_in_notebook.py
-      language: system
-      types: [jupyter]
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
   hooks:
