@@ -74,7 +74,50 @@ def mesh_to_gt(
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
-        __plot_model(mask, grid, output_dir)
+        __plot_model(grid, output_dir)
+
+    if save_mesh:
+        shutil.copy(mesh_path, output_dir / "mesh.pk")
+
+
+def mesh_to_gt_function(
+    mesh_path: Union[Path, str],
+    function: callable,
+    save_image: bool = True,
+    save_uniform: bool = True,
+    save_mesh: bool = True,
+    output_name: Optional[str] = None,
+) -> None:
+    mesh_path = get_mesh_path(mesh_path)
+    if output_name is None:
+        output_name = mesh_path.stem
+    output_dir = GROUND_TRUTH_DIR / output_name
+    output_dir.mkdir(exist_ok=True)
+    mesh_points, mesh_triangles = get_mesh(mesh_path)
+    # Here we define the surface
+    tgen = tetgen.TetGen(mesh_points, mesh_triangles)
+    # Here we run the algorithm to mesh the inside with thetrahedrons
+    tgen.tetrahedralize()
+    # get all cell centroids
+    grid = tgen.grid
+
+    grid = grid.compute_cell_sizes(volume=True, area=False, length=False)
+    mascon_points_nu = np.array(grid.cell_centers().points)
+    mascon_masses_nu = grid["Volume"]
+    mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
+    if save_uniform:
+        with open(output_dir / "mascon_model_uniform.pk", "wb") as file:
+            pk.dump((mascon_points_nu, mascon_masses_nu), file)
+    mascon_masses_nu *= np.apply_along_axis(function, 1, mascon_points_nu)
+    mascon_masses_nu = mascon_masses_nu / sum(mascon_masses_nu)
+    mascon_densities = mascon_masses_nu / grid["Volume"]
+    grid.cell_data["mass"] = mascon_densities
+
+    with open(output_dir / "mascon_model.pk", "wb") as file:
+        pk.dump((mascon_points_nu, mascon_masses_nu), file)
+
+    if save_image:
+        __plot_model(grid, output_dir)
 
     if save_mesh:
         shutil.copy(mesh_path, output_dir / "mesh.pk")
@@ -135,13 +178,13 @@ def mesh_to_gt_random_spots(
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
-        __plot_model(mask, grid, output_dir)
+        __plot_model(grid, output_dir)
 
     if save_mesh:
         shutil.copy(mesh_path, output_dir / "mesh.pk")
 
 
-def __plot_model(mask: np.ndarray, grid: pv.UnstructuredGrid, output_dir: Path) -> None:
+def __plot_model(grid: pv.UnstructuredGrid, output_dir: Path) -> None:
     pv.start_xvfb()
     pv.set_jupyter_backend("static")
 
@@ -190,12 +233,12 @@ def __plot_model(mask: np.ndarray, grid: pv.UnstructuredGrid, output_dir: Path) 
         plotter.camera_position = position
         plotter.add_text(label, position="upper_edge", font_size=18)
 
+    # XY slice (z=0) - look along +z
+    add_frontal_slice(0, 1, "z", "XY Slice", "xy")
     # YZ slice (x=0) - look along +x
-    add_frontal_slice(0, 1, "x", "YZ Slice", "yz")
+    add_frontal_slice(1, 1, "x", "YZ Slice", "yz")
     # XZ slice (y=0) - look along +y
     add_frontal_slice(1, 0, "y", "XZ Slice", "xz")
-    # XY slice (z=0) - look along +z
-    add_frontal_slice(1, 1, "z", "XY Slice", "xy")
 
     # plotter.link_views()  # Optional: link views for zoom/pan
     plotter.screenshot(output_dir / "combined_plot.png", return_img=False)

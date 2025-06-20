@@ -1,7 +1,11 @@
 import numpy as np
 from tqdm import tqdm
 
-from mascon_cube.data.mesh import mesh_to_gt, mesh_to_gt_random_spots
+from mascon_cube.data.mesh import (
+    mesh_to_gt,
+    mesh_to_gt_function,
+    mesh_to_gt_random_spots,
+)
 
 ground_truth_configs = {
     "planetesimal": {
@@ -17,9 +21,13 @@ ground_truth_configs = {
         < 0.2,
         "mask_scalar": 0,
     },
-    "itokawa_spots": {
+    "planetesimal_uniform": {
+        "mesh": "planetesimal_lp",
+        "lambda": lambda x: 1.0,
+    },
+    "itokawa_cos": {
         "mesh": "itokawa_lp",
-        "spot_frequency": 0.1,
+        "lambda": lambda x: np.cos(2 * x[0]),
     },
     "itokawa": {
         "mesh": "itokawa_lp",
@@ -31,13 +39,22 @@ ground_truth_configs = {
         "mask_generator": lambda x: np.bitwise_or(x[:, 2] > 0.3, x[:, 2] < -0.3),
         "mask_scalar": 3,
     },
-    "eros": {
+    "eros_uniform": {
+        "mesh": "eros_lp",
+        "lambda": lambda x: 1.0,
+    },
+    "eros_2": {
+        "mesh": "eros_lp",
+        "mask_generator": lambda x: x[:, 1] < -0.05,
+        "mask_scalar": 1.5,
+    },
+    "eros_3": {
         "mesh": "eros_lp",
         "mask_generator": [
             lambda x: x[:, 0] < -0.3,
             lambda x: x[:, 0] - 0.5 * x[:, 2] > 0.4,
         ],
-        "mask_scalar": [5, 0.5],
+        "mask_scalar": [2.5, 0.2],
     },
 }
 
@@ -52,6 +69,9 @@ for asteroid, config in ground_truth_configs.items():
         mesh_to_gt_random_spots(
             mesh, frequency=spot_frequency, seed=42, output_name=asteroid
         )
+    elif "lambda" in config:
+        lambda_function = config["lambda"]
+        mesh_to_gt_function(mesh, lambda_function, output_name=asteroid)
     else:
         mask_generator = config["mask_generator"]
         mask_scalar = config["mask_scalar"]
