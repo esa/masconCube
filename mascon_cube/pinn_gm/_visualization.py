@@ -1,27 +1,22 @@
 import matplotlib as mpl
 import numpy as np
 import torch
-import tqdm
 from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation as rotation
+from tqdm import tqdm
 
 from ._utils import compute_density
 
 
 def plot_model_contours(
     model,
-    encoding,
     heatmap=False,
     section=np.array([0, 0, 1]),
     N=100,
     save_path=None,
     offset=0.0,
     axes=None,
-    c=1.0,
     levels=[0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
-    add_shape_base_value=None,
-    add_const_density=1.0,
-    geomscale=False,
 ):
     """Takes a mass density model and plots the density contours of its section with
        a 2D plane
@@ -70,7 +65,7 @@ def plot_model_contours(
     # ... and compute them
 
     position = torch.tensor(newp, dtype=torch.float32).requires_grad_(True)
-    potential = model(encoding(position))
+    potential = model(position)
     # scale proxy potential into true potential, see section 3.3 of PINN paper
     r = torch.norm(position, dim=1).view(-1, 1)
     n = torch.where(r > 1, r, torch.ones_like(r))
@@ -88,6 +83,9 @@ def plot_model_contours(
     Z = rho.reshape((N, N)).cpu().detach().numpy()
 
     X, Y = np.meshgrid(np.linspace(-1, 1, N), np.linspace(-1, 1, N))
+    # X = X[np.abs(Z) > 1]
+    # Y = Y[np.abs(Z) > 1]
+    # Z = Z[np.abs(Z) > 1]
     if axes is None:
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -99,17 +97,9 @@ def plot_model_contours(
         X, Y = Y, X
 
     if heatmap:
-        gradient = np.linspace(0, 255, len(levels), dtype=np.uint8).reshape(-1, 1)
-        cmap = plt.get_cmap("YlOrRd")
-        colors = [cmap(i) for i in gradient]
-        ticks = [f"{lev:.2f}" for lev in levels]
-        ticks[0] = ""
-        ticks[1] = f"< {ticks[1]}"
-        ticks[-1] = ""
-        ticks[-2] = f"> {ticks[-2]}"
-        p = ax.contourf(X, Y, Z, levels=levels, colors=colors)
+        print(Z.shape, X.shape, Y.shape)
+        p = ax.contourf(X, Y, Z, cmap="viridis", levels=levels)
         cb = plt.colorbar(p, ax=ax)
-        cb.set_ticklabels(ticks)
     else:
         cmap = mpl.cm.viridis
         p = ax.contour(X, Y, Z, cmap=cmap, levels=levels)
@@ -127,27 +117,21 @@ def plot_model_contours(
 
 def plot_pinn_vs_mascon_contours(
     model,
-    encoding,
     mascon_points,
     mascon_masses=None,
     N=2500,
     crop_p=1e-2,
     s=100,
     save_path=None,
-    c=1.0,
     progressbar=False,
     offset=0.0,
     heatmap=False,
     mascon_alpha=0.05,
-    add_shape_base_value=None,
-    add_const_density=1.0,
-    geomscale=False,
 ):
     """Plots both the mascon and model contours in one figure for direct comparison
 
     Args:
         model (callable (N,M)->1): neural model for the asteroid.
-        encoding: the encoding for the neural inputs.
         mascon_points (2-D array-like): an (N, 3) array-like object containing the coordinates of the mascon points.
         mascon_masses (1-D array-like): a (N,) array-like object containing the values for the mascon masses.
         N (int): number of points to be considered.
@@ -193,7 +177,7 @@ def plot_pinn_vs_mascon_contours(
             outside_pos = torch.stack([torch.zeros(3), torch.ones(3)]).requires_grad_(
                 True
             )
-            potential_outside = model(encoding(outside_pos))
+            potential_outside = model(outside_pos)
             r = torch.norm(outside_pos, dim=1).view(-1, 1)
             n = torch.where(r > 1, r, torch.ones_like(r))
             potential_outside = potential_outside / n
@@ -206,7 +190,7 @@ def plot_pinn_vs_mascon_contours(
             u_nn = potential_outside
             potential_outside = w_bc * u_bc + w_nn * u_nn
             position = candidates.requires_grad_(True)
-            potential = model(encoding(position))
+            potential = model(position)
             # scale proxy potential into true potential, see section 3.3 of PINN paper
             r = torch.norm(position, dim=1).view(-1, 1)
             n = torch.where(r > 1, r, torch.ones_like(r))
@@ -219,15 +203,6 @@ def plot_pinn_vs_mascon_contours(
             potential = w_bc * u_bc + w_nn * u_nn
             rho_candidates = compute_density(position, potential, G=1).unsqueeze(1)
 
-        mask = (torch.abs(rho_candidates) > (torch.rand(batch_size, 1) + crop_p)) & (
-            ~torch.isnan(rho_candidates)
-        )
-        rho_candidates = rho_candidates[mask]
-        candidates = [
-            [it[0].item(), it[1].item(), it[2].item()]
-            for it, m in zip(candidates, mask)
-            if m
-        ]
         if len(candidates) == 0:
             print("All points rejected! Plot is empty, try cropping less?")
             return
@@ -242,8 +217,8 @@ def plot_pinn_vs_mascon_contours(
     rho = torch.cat(rho, dim=0)[:N]  # concat and discard after N
     levels = np.arange(
         np.min(rho.cpu().detach().numpy()),
-        np.max(rho.cpu().detach().numpy()) + 0.002,
-        0.001,
+        np.max(rho.cpu().detach().numpy()),
+        0.1,
     )
 
     fig = plt.figure(figsize=(6, 6), dpi=100, facecolor="white")
@@ -310,16 +285,11 @@ def plot_pinn_vs_mascon_contours(
     )
     _ = plot_model_contours(
         model,
-        encoding,
         section=np.array([0, 0, 1]),
         axes=ax2,
         levels=levels,
-        c=c,
         offset=offset,
         heatmap=heatmap,
-        add_shape_base_value=add_shape_base_value,
-        add_const_density=add_const_density,
-        geomscale=geomscale,
     )
     ax2.scatter(
         x[mask],
@@ -348,16 +318,11 @@ def plot_pinn_vs_mascon_contours(
     )
     _ = plot_model_contours(
         model,
-        encoding,
         section=np.array([0, 1, 0]),
         axes=ax3,
         levels=levels,
-        c=c,
         offset=offset,
         heatmap=heatmap,
-        add_shape_base_value=add_shape_base_value,
-        add_const_density=add_const_density,
-        geomscale=geomscale,
     )
     ax3.scatter(
         x[mask],
@@ -386,16 +351,11 @@ def plot_pinn_vs_mascon_contours(
     )
     _ = plot_model_contours(
         model,
-        encoding,
         section=np.array([1, 0, 0]),
         axes=ax4,
         levels=levels,
-        c=c,
         offset=offset,
         heatmap=heatmap,
-        add_shape_base_value=add_shape_base_value,
-        add_const_density=add_const_density,
-        geomscale=geomscale,
     )
     ax4.scatter(
         y[mask],
