@@ -13,9 +13,9 @@ def train(asteroid: str, use_tensorboard: bool) -> MasconCube:
     config = CubeTrainingConfig(asteroid=asteroid)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    val_dataset = torch.load(
-        VAL_DATASETS_DIR / f"{asteroid.split('_')[0]}_lp_1000_spherical_0_2.pt"
-    ).to(device)
+    val_dataset = torch.load(VAL_DATASETS_DIR / f"{asteroid}_1000_spherical_0_2.pt").to(
+        device
+    )
     val_config = ValidationConfig(val_dataset=val_dataset, val_every_n_epochs=50)
     log_config = LogConfig() if use_tensorboard else None
 
@@ -24,6 +24,7 @@ def train(asteroid: str, use_tensorboard: bool) -> MasconCube:
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     parser = ArgumentParser()
     parser.add_argument("asteroid", type=str)
     parser.add_argument("--tensorboard", "-t", action="store_true")

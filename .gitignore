@@ -1,6 +1,5 @@
 data/3dmeshes/*.pk
-data/ground_truths/**/*.pk
-data/ground_truths/**/*.png
+data/ground_truths/**/*
 data/output/*.pt
 data/output/**/*
 *.egg-info

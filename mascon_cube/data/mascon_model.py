@@ -61,23 +61,23 @@ class MasconModel:
         Returns:
             MasconCube: The mascon cube
         """
-        cube = MasconCube(
-            cube_side, self.mascon_name, device=self.device, differential=False
-        )
+        # We do it on cpu as it requires a lot of memory
+        cube = MasconCube(cube_side, self.mascon_name, device="cpu", differential=False)
         mesh_points, mesh_triangles = get_mesh(self.mascon_name)
         # Here we define the surface
         tgen = tetgen.TetGen(mesh_points, mesh_triangles)
         # Here we run the algorithm to mesh the inside with thetrahedrons
         nodes, elem = tgen.tetrahedralize()
-        nodes = torch.tensor(nodes, device=self.device)
-        elem = torch.tensor(elem, device=self.device)
+        nodes = torch.tensor(nodes, device="cpu")
+        elem = torch.tensor(elem, device="cpu")
         indeces = points_in_tetrahedra_torch(cube.coords, nodes, elem)
         grid = tgen.grid
         grid = grid.compute_cell_sizes(volume=True, area=False, length=False)
-        volumes = torch.tensor(grid["Volume"], device=self.device)
-        masses = self.masses[indeces] / volumes[indeces]
+        volumes = torch.tensor(grid["Volume"], device="cpu")
+        masses = self.masses[indeces].cpu() / volumes[indeces]
         cube.weights = masses / masses.sum()
-        return cube
+        # We move it back to the original device
+        return cube.to(self.device)
 
     def get_volume(self) -> float:
         """Get the volume of the mascon. It is computed only once and then cached.

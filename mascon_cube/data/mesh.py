@@ -21,6 +21,8 @@ def mesh_to_gt(
     save_uniform: bool = True,
     save_mesh: bool = True,
     output_name: Optional[str] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
 ) -> None:
     """Generate the mascon model ground truth from a mesh file.
 
@@ -35,6 +37,8 @@ def mesh_to_gt(
         save_mesh (bool, optional): Whether to save the mesh. Defaults to True.
         output_name (str, optional): The name of the output directory.
             Defaults to None, in which case the mesh name is used.
+        vmin (Optional[float], optional): Minimum value for the color scale in the image. Defaults to None.
+        vmax (Optional[float], optional): Maximum value for the color scale in the image. Defaults to None.
     """
     if not isinstance(mask_generators, (list, tuple)):
         mask_generators = [mask_generators]
@@ -74,7 +78,7 @@ def mesh_to_gt(
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
-        __plot_model(grid, output_dir)
+        __plot_model(grid, output_dir, vmin=vmin, vmax=vmax)
 
     if save_mesh:
         shutil.copy(mesh_path, output_dir / "mesh.pk")
@@ -87,7 +91,22 @@ def mesh_to_gt_function(
     save_uniform: bool = True,
     save_mesh: bool = True,
     output_name: Optional[str] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
 ) -> None:
+    """Generate the mascon model ground truth from a mesh file using a function.
+    Args:
+        mesh_path (Union[Path, str]): Path to the mesh file or the name of the mesh file in the data/3dmeshes folder.
+        function (callable): A function that takes a numpy array of points and returns a scalar value for each point.
+            This will be used to define the density of the mascons.
+        save_image (bool, optional): Whether to save the image of the ground truth. Defaults to True.
+        save_uniform (bool, optional): Whether to save also the uniform ground truth. Defaults to True.
+        save_mesh (bool, optional): Whether to save the mesh. Defaults to True.
+        output_name (str, optional): The name of the output directory.
+            Defaults to None, in which case the mesh name is used.
+        vmin (Optional[float], optional): Minimum value for the color scale in the image. Defaults to None.
+        vmax (Optional[float], optional): Maximum value for the color scale in the image. Defaults to None.
+    """
     mesh_path = get_mesh_path(mesh_path)
     if output_name is None:
         output_name = mesh_path.stem
@@ -117,7 +136,7 @@ def mesh_to_gt_function(
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
-        __plot_model(grid, output_dir)
+        __plot_model(grid, output_dir, vmin, vmax)
 
     if save_mesh:
         shutil.copy(mesh_path, output_dir / "mesh.pk")
@@ -131,6 +150,8 @@ def mesh_to_gt_random_spots(
     save_uniform: bool = True,
     save_mesh: bool = True,
     output_name: Optional[str] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
 ) -> None:
     """Generate the mascon model ground truth from a mesh file.
 
@@ -143,6 +164,8 @@ def mesh_to_gt_random_spots(
         save_mesh (bool, optional): Whether to save the mesh. Defaults to True.
         output_name (str, optional): The name of the output directory.
             Defaults to None, in which case the mesh name is used.
+    vmin (Optional[float], optional): Minimum value for the color scale in the image. Defaults to None.
+    vmax (Optional[float], optional): Maximum value for the color scale in the image. Defaults to None.
     """
     mesh_path = get_mesh_path(mesh_path)
     if output_name is None:
@@ -178,17 +201,24 @@ def mesh_to_gt_random_spots(
         pk.dump((mascon_points_nu, mascon_masses_nu), file)
 
     if save_image:
-        __plot_model(grid, output_dir)
+        __plot_model(grid, output_dir, vmin=vmin, vmax=vmax)
 
     if save_mesh:
         shutil.copy(mesh_path, output_dir / "mesh.pk")
 
 
-def __plot_model(grid: pv.UnstructuredGrid, output_dir: Path) -> None:
+def __plot_model(
+    grid: pv.UnstructuredGrid,
+    output_dir: Path,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+) -> None:
     pv.start_xvfb()
     pv.set_jupyter_backend("static")
-
-    vmin, vmax = 0, np.max(grid["mass"])
+    if vmin is None:
+        vmin = 0
+    if vmax is None:
+        vmax = np.max(grid["mass"])
     scalar_bar_args = {
         "title": "Density",
         "vertical": False,
