@@ -20,17 +20,9 @@ def plot_asteroid(asteroid: str) -> plt.Figure:
     Returns:
         plt.Figure: The figure with the 4 subplots (3D, XY, XZ, YZ).
     """
-    img = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot.png")
-    img_xy = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot_xy.png")
-    img_xz = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot_xz.png")
-    img_yz = plt.imread(GROUND_TRUTH_DIR / asteroid / "plot_yz.png")
-
-    # Concatenate horizontally
-    combined = np.vstack((np.hstack((img, img_xy)), np.hstack((img_xz, img_yz))))
-
-    # Show or save the result
+    img = plt.imread(GROUND_TRUTH_DIR / asteroid / "combined_plot.png")
     fig = plt.figure(figsize=(10, 10))
-    plt.imshow(combined)
+    plt.imshow(img)
     plt.title(asteroid)
     plt.axis("off")
     return fig
@@ -206,15 +198,55 @@ def plot_mascon_cube(
         return fig
 
 
+def stokes_degree_error(
+    preds: np.ndarray,
+    gt: np.ndarray,
+    labels: list[str],
+    title: str = "",
+    vmin: float = 1e-4,
+    vmax: float = 5e-1,
+    relative: bool = False,
+    markers: Optional[list[str]] = None,
+) -> plt.Figure:
+    if isinstance(preds, Tensor):
+        preds = preds.detach().cpu().numpy()
+    if isinstance(gt, Tensor):
+        gt = gt.detach().cpu().numpy()
+    if preds.ndim == 2:
+        preds = np.expand_dims(preds, axis=0)
+    fig, ax = plt.subplots(figsize=(14, 4), dpi=200)
+    if markers is None:
+        markers = ["o"] * len(labels)
+    for j, (pred, label) in enumerate(zip(preds, labels)):
+        diff = np.abs(pred - gt)
+        if relative:
+            diff = diff / (np.abs(gt) + 1e-16)
+        assert diff.ndim == 2, "pred and gt must be 2D arrays"
+        assert diff.shape[0] == diff.shape[1], "pred and gt must be square matrices"
+        max_degree = diff.shape[0]
+        errors = []
+        for i in range(0, max_degree):
+            error = diff[: i + 1, : i + 1]
+            error = np.mean(error).item()
+            errors.append(error)
+        errors = np.array(errors)
+        ax.semilogy(np.arange(0, max_degree), errors, marker=markers[j], label=label)
+    ax.legend()
+
+    ax.set_xlabel(r"Degree $n$")
+    ax.set_ylabel(r"$MAE_n$")
+    return fig
+
+
 def stokes_heatmap(
     pred: np.ndarray,
     gt: np.ndarray,
     title: str = "",
-    vmin: float = 1e-4,
-    vmax: float = 5e-1,
-    xlabel: str = r"$l$",
-    ylabel: str = r"$m$",
-    relative: bool = True,
+    vmin=1e-7,
+    vmax=1e-2,
+    xlabel: str = r"$m$",
+    ylabel: str = r"$l$",
+    relative: bool = False,
 ) -> plt.Figure:
     """Create a heatmap of the difference between the prediction and the ground truth.
 
@@ -254,10 +286,10 @@ def stokes_heatmap(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax_top = ax.secondary_xaxis("top")
-    ax_top.set_xlabel(xlabel)
+    ax_top.set_xlabel(ylabel)
     ax_top.set_xticks(np.arange(1.5, pred.shape[1], 1), np.arange(1, pred.shape[1], 1))
     ax_right = ax.secondary_yaxis("right")
-    ax_right.set_ylabel(ylabel)
+    ax_right.set_ylabel(xlabel)
     ax_right.set_yticks(
         np.arange(0.5, pred.shape[0] - 1, 1), np.arange(0, pred.shape[0] - 1, 1)
     )
@@ -273,7 +305,7 @@ def stokes_heatmap(
     plt.text(
         1.01,
         1.01,
-        r"$\tilde{S}_{m,l}$",
+        r"$\Delta\tilde{S}_{l,m}$",
         fontsize=14,
         horizontalalignment="left",
         verticalalignment="bottom",
@@ -282,7 +314,7 @@ def stokes_heatmap(
     plt.text(
         -0.01,
         -0.01,
-        r"$\tilde{C}_{m,l}$",
+        r"$\Delta\tilde{C}_{l,m}$",
         fontsize=14,
         horizontalalignment="right",
         verticalalignment="top",
@@ -340,7 +372,10 @@ def plot_trajectory(
     """
     Plot the body-frame and inertial-frame trajectories with asteroid model.
     """
-    fig = plt.figure(figsize=(6, 6))
+    fig = plt.figure(figsize=(9, 4), dpi=100)
+    ax0 = fig.add_subplot(121, projection="3d", aspect="equal")
+    ax1 = fig.add_subplot(122, projection="3d", aspect="equal")
+
     a = (
         (np.max(mascon_points[:, 0]) - np.min(mascon_points[:, 0]))
         / 2
@@ -356,9 +391,9 @@ def plot_trajectory(
         / 2
         * safety_coefficient
     )
-    D = 3
+    D = 2
 
-    def plot_panel(ax, traj, az, el, D, title):
+    def plot_panel(ax, traj, az, el, D, title, ticks):
         ax.scatter3D(
             mascon_points[:, 0],
             mascon_points[:, 1],
@@ -367,37 +402,19 @@ def plot_trajectory(
             s=2,
             c="k",
         )
-        _plot_ellipsoid(ax, a, b, c, color="r", alpha=0.05)
-        _plot_ellipsoid(
-            ax, exit_radius, exit_radius, exit_radius, color="y", alpha=0.05
-        )
-        ax.plot3D(traj[:, 0], traj[:, 1], traj[:, 2])
-        ax.set_xlim(-D, D)
-        ax.set_ylim(-D, D)
-        ax.set_zlim(-D, D)
+        _plot_ellipsoid(ax, a, b, c, color="r", alpha=0.1)
+        _plot_ellipsoid(ax, exit_radius, exit_radius, exit_radius, color="y", alpha=0.1)
+        ax.plot3D(traj[:, 0], traj[:, 1], traj[:, 2], color="b")
+
         ax.view_init(az, el)
         ax.set_title(title)
-        ax.set_xticks([-2, -1, 0, 1, 2])
-        ax.set_yticks([-2, -1, 0, 1, 2])
-        ax.set_zticks([])
+        ax.set_xlabel(r"$x$")
+        ax.set_ylabel(r"$y$")
+        ax.set_zlabel(r"$z$")
 
-    # Body frame views
+    plot_panel(ax1, trajectory, 45, 45, D, "Body frame", ticks=["x", "y", "z"])
     plot_panel(
-        fig.add_subplot(221, projection="3d"), trajectory, 0, 90, D, "body frame"
-    )
-    plot_panel(
-        fig.add_subplot(222, projection="3d"), trajectory, 90, 0, D, "body frame"
-    )
-    plot_panel(fig.add_subplot(223, projection="3d"), trajectory, 0, 0, D, "body frame")
-    # Inertial frame view
-    plot_panel(
-        fig.add_subplot(224, projection="3d"),
-        rotated_trajectory,
-        0,
-        90,
-        D,
-        "inertial frame",
+        ax0, rotated_trajectory, 45, 45, D, "Inertial frame", ticks=["x", "y", "z"]
     )
 
-    plt.tight_layout()
     return fig
