@@ -67,3 +67,5 @@ And then enable logging in the training script by passing the `--tensorboard` ar
 ```bash
 python scripts/train.py eros_uniform --tensorboard
 ```
+
+<img width="1049" height="1108" alt="image" src="https://github.com/user-attachments/assets/a1bce63c-471e-4300-acb1-06ce40351d04" />
