@@ -597,9 +597,9 @@ def plot_model_vs_mascon_rejection(model, encoding, points, masses=None, N=2500,
         plt.savefig(save_path, dpi=300)
 
 
-def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=None, N=2500, crop_p=1e-2, s=100, save_path=None,
+def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=None, N=2500, crop_p=1e-2, s=1.8, save_path=None,
                                   c=1., progressbar=False, offset=0.0, heatmap=False, mascon_alpha=0.05,
-                                  add_shape_base_value=None, add_const_density=1.):
+                                  add_shape_base_value=None, add_const_density=1., range=None):
     """Plots both the mascon and model contours in one figure for direct comparison
 
     Args:
@@ -625,6 +625,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     x = mascon_points[:, 0].cpu()
     y = mascon_points[:, 1].cpu()
     z = mascon_points[:, 2].cpu()
+    
 
     if add_shape_base_value is not None:
         # Load asteroid triangles
@@ -676,12 +677,15 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     if progressbar:
         pbar.close()
     points = torch.cat(points, dim=0)[: N]  # concat and discard after N
-    rho = torch.cat(rho, dim=0)[: N]  # concat and discard after N
+    rho = torch.cat(rho, dim=0)[: N].detach().cpu()  # concat and discard after N
+    if range is None:
+        # take 99th percentile of the mass
+        range = (0, np.percentile(rho, 100))
 
     # levels = np.linspace(0, 2.7, 10)
     # levels = np.linspace(np.min(rho.cpu().detach().numpy()),
     #                      np.max(rho.cpu().detach().numpy()), 10)
-    levels = np.arange(np.min(rho.cpu().detach().numpy()), np.max(rho.cpu().detach().numpy())+.002,.001)
+    levels = np.arange(range[0], range[1]+.002,.001)
 
     fig = plt.figure(figsize=(6, 6), dpi=100, facecolor='white')
     ax = fig.add_subplot(2, 2, 1, projection='3d')
@@ -692,7 +696,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     # And we plot it
     # ax.scatter(x, y, z, color='k', s=normalized_masses, alpha=0.01)
     ax.scatter(points[:, 0].cpu(), points[:, 1].cpu(), points[:, 2].cpu(),
-               marker='.', c=rejection_col, s=s*2, alpha=0.1)
+               marker='.', c=rho, cmap="viridis", s=s, vmin=range[0], vmax=range[1])
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
     ax.set_zlim([-1, 1])
@@ -721,8 +725,8 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
                              z - offset > -mascon_slice_thickness)
     _ = plot_model_contours(model, encoding, section=np.array(
         [0, 0, 1]), axes=ax2, levels=levels, c=c, offset=offset, heatmap=heatmap, add_shape_base_value=add_shape_base_value, add_const_density=add_const_density)
-    ax2.scatter(x[mask], y[mask], color=mascon_color,
-                s=normalized_masses[mask], alpha=mascon_alpha)
+    # ax2.scatter(x[mask], y[mask], color=mascon_color,
+    #             s=normalized_masses[mask], alpha=mascon_alpha)
 
     ax2.set_xlim([-1, 1])
     ax2.set_ylim([-1, 1])
@@ -742,8 +746,8 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
                              y - offset > -mascon_slice_thickness)
     _ = plot_model_contours(model, encoding, section=np.array(
         [0, 1, 0]), axes=ax3, levels=levels, c=c, offset=offset, heatmap=heatmap, add_shape_base_value=add_shape_base_value, add_const_density=add_const_density)
-    ax3.scatter(x[mask], z[mask], color=mascon_color,
-                s=normalized_masses[mask], alpha=mascon_alpha)
+    # ax3.scatter(x[mask], z[mask], color=mascon_color,
+    #             s=normalized_masses[mask], alpha=mascon_alpha)
 
     ax3.set_xlim([-1, 1])
     ax3.set_ylim([-1, 1])
@@ -763,8 +767,8 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
                              x - offset > -mascon_slice_thickness)
     _ = plot_model_contours(model, encoding, section=np.array(
         [1, 0, 0]), axes=ax4, levels=levels, c=c, offset=offset, heatmap=heatmap, add_shape_base_value=add_shape_base_value, add_const_density=add_const_density)
-    ax4.scatter(y[mask], z[mask], color=mascon_color,
-                s=normalized_masses[mask], alpha=mascon_alpha)
+    # ax4.scatter(y[mask], z[mask], color=mascon_color,
+    #             s=normalized_masses[mask], alpha=mascon_alpha)
     ax4.set_xlim([-1, 1])
     ax4.set_ylim([-1, 1])
     ax4.set_xlabel("Y", fontsize=8)
