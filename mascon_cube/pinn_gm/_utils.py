@@ -67,3 +67,38 @@ def compute_density(coords: torch.Tensor, potential: torch.Tensor, G: float = 1)
     # Compute density using Poisson's equation
     density = laplacian / (4 * torch.pi * G)
     return density
+
+
+def rms_loss(predicted, labels):
+    """Computes the RMS loss between predicted and labels
+    Args:
+        predicted (torch.tensor): model predictions
+        labels (torch.tensor): ground truth labels
+    Returns:
+        [torch.tensor]: RMS loss
+    """
+    return torch.linalg.norm(labels - predicted, dim=1)
+
+
+def percent_loss(predicted, labels):
+    """Computes the percent loss between predicted and labels
+    Args:
+        predicted (torch.tensor): model predictions
+        labels (torch.tensor): ground truth labels
+    Returns:
+        [torch.tensor]: percent loss
+    """
+    diff_norm = torch.linalg.norm(labels - predicted, dim=1)
+    gt_norm = torch.linalg.norm(labels, dim=1)
+    return torch.where(gt_norm != 0, diff_norm / gt_norm, torch.zeros_like(diff_norm))
+
+
+def pinn_loss(predicted, labels):
+    """Computes the PINN loss as described in the paper
+    Args:
+        predicted (torch.tensor): model predictions
+        labels (torch.tensor): ground truth labels
+    Returns:
+        [torch.tensor]: PINN loss
+    """
+    return ((rms_loss(predicted, labels) + percent_loss(predicted, labels)) / 2).mean()

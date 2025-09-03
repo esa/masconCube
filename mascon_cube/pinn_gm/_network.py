@@ -5,7 +5,7 @@ from ._utils import spherical_5d_encoding
 
 
 class PinnGM(nn.Module):
-    def __init__(self, hidden_features=16, hidden_layers=8):
+    def __init__(self, hidden_features=32, hidden_layers=6):
         super().__init__()
         self.encoder_1 = nn.Linear(5, hidden_features)
         self.encoder_2 = nn.Linear(5, hidden_features)
