@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 from mascon_cube import geodesynet
-from mascon_cube.constants import GROUND_TRUTH_DIR, OUTPUT_DIR
+from mascon_cube.constants import DATA_DIR, OUTPUT_DIR
 from mascon_cube.data.mascon_model import MasconModel
 
 
@@ -37,7 +37,9 @@ def train_geodesynet(asteroid: str):
     mc_method = geodesynet.ACC_trap
     targets_point_sampler = geodesynet.get_target_point_sampler(
         batch_size,
-        limit_shape_to_asteroid=GROUND_TRUTH_DIR / asteroid / "mesh.pk",
+        limit_shape_to_asteroid=DATA_DIR
+        / "3dmeshes"
+        / f"{asteroid.split('_')[0]}_lp.pk",
         method="spherical",
         bounds=[0.0, 1.0],
     )
