@@ -36,6 +36,7 @@ class MasconModel:
         self.masses = torch.tensor(mascon_masses, device=device)
         self.device = self.coords.device
         self.mascon_name = mascon_path.parent.stem
+        self._path = mascon_path.parent
 
     def to(self, device: Union[str, torch.device]) -> "MasconModel":
         """Move the model to a different device
@@ -52,15 +53,20 @@ class MasconModel:
         new_model.device = device
         return new_model
 
-    def to_cube(self, cube_side: int) -> MasconCube:
+    def to_cube(self, cube_side: int, cache: bool = False) -> MasconCube:
         """Convert the mascon model to a mascon cube
 
         Args:
             cube_side (int): the side of the output cube
+            cache (bool): If True, the cube is saved to disk and loaded from there if it exists.
+                          If False, the cube is computed every time.
 
         Returns:
             MasconCube: The mascon cube
         """
+        if cache and (self._path / f"cube_{cube_side}.pt").exists():
+            cube = torch.load(self._path / f"cube_{cube_side}.pt", weights_only=False)
+            return cube.to(self.device)
         # We do it on cpu as it requires a lot of memory
         cube = MasconCube(cube_side, self.mascon_name, device="cpu", differential=False)
         mesh_points, mesh_triangles = get_mesh(self.mascon_name)
@@ -77,6 +83,8 @@ class MasconModel:
         masses = self.masses[indeces].cpu() / volumes[indeces]
         cube.weights = masses / masses.sum()
         # We move it back to the original device
+        if cache:
+            torch.save(cube, self._path / f"cube_{cube_side}.pt")
         return cube.to(self.device)
 
     def get_volume(self) -> float:
