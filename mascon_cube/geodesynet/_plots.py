@@ -597,8 +597,8 @@ def plot_model_vs_mascon_rejection(model, encoding, points, masses=None, N=2500,
         plt.savefig(save_path, dpi=300)
 
 
-def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=None, N=2500, crop_p=1e-2, s=1.8, save_path=None,
-                                  c=1., progressbar=False, offset=0.0, heatmap=False, mascon_alpha=0.05,
+def plot_model_vs_mascon_contours(model, encoding, N=2500, crop_p=1e-2, s=1.8, save_path=None,
+                                  c=1., progressbar=False, offset=0.0, heatmap=False,
                                   add_shape_base_value=None, add_const_density=1., range=None):
     """Plots both the mascon and model contours in one figure for direct comparison
 
@@ -619,13 +619,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
         mascon_alpha (float): alpha of the overlaid mascon model. Defaults to 0.05.
         add_shape_base_value (str): path to asteroid mesh which is then used to add 1 to density inside asteroid
         add_const_density (float): density to add inside asteroid if add_shape_base_value was passed
-    """
-
-    # Mascon masses
-    x = mascon_points[:, 0].cpu()
-    y = mascon_points[:, 1].cpu()
-    z = mascon_points[:, 2].cpu()
-    
+    """    
 
     if add_shape_base_value is not None:
         # Load asteroid triangles
@@ -633,14 +627,7 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
             mesh_vertices, mesh_triangles = pk.load(file)
             triangles = unpack_triangle_mesh(mesh_vertices, mesh_triangles)
 
-    s = 22000 / len(mascon_points)
 
-    if mascon_masses is None:
-        normalized_masses = torch.tensor(
-            [1./len(mascon_points)] * len(mascon_points))
-    else:
-        normalized_masses = mascon_masses / sum(mascon_masses)
-    normalized_masses = (normalized_masses * s * len(x)).cpu()
 
     torch.manual_seed(42)  # Seed torch to always get the same points
     points = []
@@ -681,6 +668,8 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
     if range is None:
         # take 99th percentile of the mass
         range = (0, np.percentile(rho, 100))
+    else:
+        range = (0, max(range[1], np.percentile(rho, 100)))
 
     # levels = np.linspace(0, 2.7, 10)
     # levels = np.linspace(np.min(rho.cpu().detach().numpy()),
@@ -689,9 +678,6 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
 
     fig = plt.figure(figsize=(6, 6), dpi=100, facecolor='white')
     ax = fig.add_subplot(2, 2, 1, projection='3d')
-    # ax.set_facecolor(backcolor)
-    rejection_col = 'yellow'
-    mascon_color = "green"
 
     # And we plot it
     # ax.scatter(x, y, z, color='k', s=normalized_masses, alpha=0.01)
@@ -717,12 +703,8 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
                       np.asarray([[0, 0], [0, 0]])+offset, color="green", linestyle="--", alpha=0.75)
     ax.set_title("3D View", fontsize=7)
 
-    mascon_slice_thickness = 0.01
-
     ax2 = fig.add_subplot(2, 2, 2)
     # ax2.set_facecolor(backcolor)
-    mask = torch.logical_and(z - offset < mascon_slice_thickness,
-                             z - offset > -mascon_slice_thickness)
     _ = plot_model_contours(model, encoding, section=np.array(
         [0, 0, 1]), axes=ax2, levels=levels, c=c, offset=offset, heatmap=heatmap, add_shape_base_value=add_shape_base_value, add_const_density=add_const_density)
     # ax2.scatter(x[mask], y[mask], color=mascon_color,
@@ -742,8 +724,6 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
 
     ax3 = fig.add_subplot(2, 2, 3)
     # ax3.set_facecolor(backcolor)
-    mask = torch.logical_and(y - offset < mascon_slice_thickness,
-                             y - offset > -mascon_slice_thickness)
     _ = plot_model_contours(model, encoding, section=np.array(
         [0, 1, 0]), axes=ax3, levels=levels, c=c, offset=offset, heatmap=heatmap, add_shape_base_value=add_shape_base_value, add_const_density=add_const_density)
     # ax3.scatter(x[mask], z[mask], color=mascon_color,
@@ -763,8 +743,6 @@ def plot_model_vs_mascon_contours(model, encoding, mascon_points, mascon_masses=
 
     ax4 = fig.add_subplot(2, 2, 4)
     # ax4.set_facecolor(backcolor)
-    mask = torch.logical_and(x - offset < mascon_slice_thickness,
-                             x - offset > -mascon_slice_thickness)
     _ = plot_model_contours(model, encoding, section=np.array(
         [1, 0, 0]), axes=ax4, levels=levels, c=c, offset=offset, heatmap=heatmap, add_shape_base_value=add_shape_base_value, add_const_density=add_const_density)
     # ax4.scatter(y[mask], z[mask], color=mascon_color,
