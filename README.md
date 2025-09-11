@@ -71,3 +71,27 @@ And then enable logging in the training script by passing the `--tensorboard` ar
 ```bash
 python scripts/train.py eros_uniform --tensorboard
 ```
+
+## License
+The code is released under the [Apache 2.0 license](https://github.com/esa/masconCube?tab=Apache-2.0-1-ov-file).
+
+## Citation
+If you find this repository useful, please kindly consider citing the following paper:
+
+```bibtex
+@misc{fanti2025masconcube,
+      title={MasconCube: Fast and Accurate Gravity Modeling with an Explicit Representation}, 
+      author={Pietro Fanti and Dario Izzo},
+      year={2025},
+      eprint={2509.08607},
+      archivePrefix={arXiv},
+      primaryClass={astro-ph.EP},
+      url={https://arxiv.org/abs/2509.08607}, 
+}
+```
+
+## Aknowledgements
+
+This codebase is based on the following open-source projects. We thank their authors for making the source code publically available.
+
+ - [geodesyNets](https://github.com/darioizzo/geodesyNets/tree/master)
