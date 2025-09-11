@@ -1,9 +1,13 @@
-# masconCube
+# MasconCube
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-![image](https://github.com/user-attachments/assets/115f03f9-f65c-40c4-a357-b9cdc53eeee2)
+Official codebase for the paper _[MasconCube: Fast and Accurate Gravity Modeling with an Explicit Representation](https://arxiv.org/abs/2509.08607v1)_.
+
+MasconCube is a fast and accurate framework for modeling gravitational fields of irregular celestial bodies. It provides an explicit mascon-based representation, enabling efficient training, validation, and comparison against state-of-the-art methods such as GeodesyNets and PINN-GM.
+
+<img width="3387" height="1180" alt="image" src="https://github.com/user-attachments/assets/3e568581-46e5-4624-b102-c92d6f6772df" />
 
 ## Installation
 
@@ -67,5 +71,3 @@ And then enable logging in the training script by passing the `--tensorboard` ar
 ```bash
 python scripts/train.py eros_uniform --tensorboard
 ```
-
-<img width="1049" height="1108" alt="image" src="https://github.com/user-attachments/assets/a1bce63c-471e-4300-acb1-06ce40351d04" />
