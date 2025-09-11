@@ -1,5 +1,6 @@
 # MasconCube
 
+[![arXiv](https://img.shields.io/badge/arXiv-2509.08607-b31b1b.svg)](https://arxiv.org/abs/2509.08607)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
