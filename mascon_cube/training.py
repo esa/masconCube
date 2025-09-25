@@ -4,15 +4,17 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Optional, Union
 
+import numpy as np
 import torch
 from tqdm import tqdm
 
 from mascon_cube import losses
 from mascon_cube.constants import TENSORBOARD_DIR
+from mascon_cube.data.datasets import RandomDataset
 from mascon_cube.data.mascon_model import MasconModel
-from mascon_cube.data.sampling import get_target_point_sampler
 from mascon_cube.logs import LogConfig, SummaryWriter
 from mascon_cube.models import MasconCube
+from mascon_cube.utils import compute_acceleration
 from mascon_cube.visualization import plot_mascon_cube
 
 
@@ -21,10 +23,10 @@ class AbstractTrainingConfig(ABC):
     """Abstract training config"""
 
     asteroid: str
-    n_epochs: int = 1000
-    n_epochs_before_resampling: int = 10
-    loss_fn: str = "normalized_l1_loss"
+    n_epochs: int = 10
+    n_samples: int = 100_000
     batch_size: int = 1000
+    loss_fn: str = "normalized_l1_loss"
     sampling_method: str = "spherical"
     sampling_min: float = 0.0
     sampling_max: float = 1.0
@@ -42,6 +44,15 @@ class CubeTrainingConfig(AbstractTrainingConfig):
     differential: bool = False
     normalize: bool = True
     activation_function: str = "linear"
+    data_from_trajectory: bool = False
+    traj_start_orb_params: tuple[float, float, float, float, float, float] = (
+        1.5,
+        0.0,
+        np.pi / 2,
+        0.0,
+        0.0,
+        np.pi / 2,
+    )
 
 
 @dataclass
@@ -87,12 +98,17 @@ def training_loop(
         patience=config.scheduler_patience,
         min_lr=config.scheduler_min_lr,
     )
-    data_sampler = get_target_point_sampler(
-        n=config.batch_size,
-        asteroid_mesh=config.asteroid,
-        method=config.sampling_method,
-        bounds=(config.sampling_min, config.sampling_max),
-        device=device,
+    training_data = RandomDataset(
+        n=config.n_samples,
+        asteroid=config.asteroid,
+        sampling_method=config.sampling_method,
+        sampling_min=config.sampling_min,
+        sampling_max=config.sampling_max,
+        seed=42,
+        cache=True,
+    )
+    dataloader = torch.utils.data.DataLoader(
+        training_data, batch_size=config.batch_size, shuffle=True
     )
     loss_fn = getattr(losses, config.loss_fn)
 
@@ -106,50 +122,58 @@ def training_loop(
             / datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         )
         writer = SummaryWriter(log_dir=log_dir)
-    iterator = tqdm(range(config.n_epochs)) if progressbar else range(config.n_epochs)
+    iterator = (
+        tqdm(range(config.n_epochs), unit="epoch", desc="Training", position=0)
+        if progressbar
+        else range(config.n_epochs)
+    )
     for i in iterator:
-        if (i % config.n_epochs_before_resampling) == 0:
-            target_points = data_sampler()
-            labels = compute_acceleration(
-                target_points, ground_truth.coords, ground_truth.masses
+        internal_iterator = (
+            tqdm(
+                dataloader, leave=False, unit="batch", desc="Current epoch", position=1
             )
+            if progressbar
+            else dataloader
+        )
+        for target_points, labels in internal_iterator:
+            target_points = target_points.to(device)
+            labels = labels.to(device)
+            predicted = compute_acceleration(target_points, cube.coords, cube.masses)
+            loss = loss_fn(predicted, labels)
 
-        predicted = compute_acceleration(target_points, cube.coords, cube.masses)
-        loss = loss_fn(predicted, labels)
+            if val_config is None and loss.item() < best_loss:
+                # If we don't have a validation set, we use the training loss to determine the best model
+                best_loss = loss.item()
+                best_cube = deepcopy(cube)
 
-        if val_config is None and loss.item() < best_loss:
-            # If we don't have a validation set, we use the training loss to determine the best model
-            best_loss = loss.item()
-            best_cube = deepcopy(cube)
+            if val_config and i % val_config.val_every_n_epochs == 0:
+                # If we have a validation set, we use the validation loss to determine the best model
+                with torch.no_grad():
+                    val_labels = compute_acceleration(
+                        val_config.val_dataset, ground_truth.coords, ground_truth.masses
+                    )
+                    val_predicted = compute_acceleration(
+                        val_config.val_dataset, cube.coords, cube.masses
+                    )
+                    val_loss = loss_fn(val_predicted, val_labels).item()
+                    if val_loss < best_loss:
+                        best_loss = val_loss
+                        best_cube = deepcopy(cube)
 
-        if val_config and i % val_config.val_every_n_epochs == 0:
-            # If we have a validation set, we use the validation loss to determine the best model
-            with torch.no_grad():
-                val_labels = compute_acceleration(
-                    val_config.val_dataset, ground_truth.coords, ground_truth.masses
-                )
-                val_predicted = compute_acceleration(
-                    val_config.val_dataset, cube.coords, cube.masses
-                )
-                val_loss = loss_fn(val_predicted, val_labels).item()
-                if val_loss < best_loss:
-                    best_loss = val_loss
-                    best_cube = deepcopy(cube)
+            # Tensorboard logging
+            if log_config is not None:
+                if i % log_config.log_every_n_epochs == 0:
+                    writer.add_scalar("Loss/train", loss.item(), i)
+                if val_config is not None and i % val_config.val_every_n_epochs == 0:
+                    writer.add_scalar("Loss/val", val_loss, i)
+                if i % log_config.draw_every_n_epochs == 0:
+                    fig = plot_mascon_cube(cube)
+                    writer.add_figure("Cube", fig, i)
 
-        # Tensorboard logging
-        if log_config is not None:
-            if i % log_config.log_every_n_epochs == 0:
-                writer.add_scalar("Loss/train", loss.item(), i)
-            if val_config is not None and i % val_config.val_every_n_epochs == 0:
-                writer.add_scalar("Loss/val", val_loss, i)
-            if i % log_config.draw_every_n_epochs == 0:
-                fig = plot_mascon_cube(cube)
-                writer.add_figure("Cube", fig, i)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        scheduler.step(loss.item())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step(loss.item())
 
     if log_config is not None:
         writer.add_hparams(asdict(config), {"best_loss": best_loss})
@@ -157,32 +181,3 @@ def training_loop(
         writer.close()
 
     return best_cube
-
-
-def compute_acceleration(
-    target_points: torch.Tensor,
-    mascon_points: torch.Tensor,
-    mascon_masses: torch.Tensor,
-):
-    """
-    Computes the acceleration due to the mascon at the target points. (to be used as Label in the training)
-
-    Args:
-        target_points (2-D array-like): an (N, 3) array-like object containing the coordinates of the points where the
-            acceleration should be computed.
-        mascon_points (2-D array-like): an (N, 3) array-like object containing the points that belong to the mascon
-        mascon_masses (1-D array-like): a (N,) array-like object containing the values for the mascon masses.
-            Can also be a scalar containing the mass value for all points.
-
-    Returns:
-        1-D array-like: a (N, 3) torch tensor containing the acceleration (G=1) at the target points
-    """
-    device = target_points.device
-    mm = mascon_masses.view(-1, 1)
-    retval = torch.empty(len(target_points), 3, device=device)
-    for i, target_point in enumerate(target_points):
-        dr = torch.sub(mascon_points, target_point)
-        retval[i] = torch.sum(
-            mm / torch.pow(torch.norm(dr, dim=1), 3).view(-1, 1) * dr, dim=0
-        )
-    return retval
