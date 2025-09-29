@@ -119,6 +119,8 @@ def simulate_trajectory(
         0.0,
         np.pi / 2,
     ),
+    n: int = 1000,
+    propagation_days: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Simulates the trajectory of a spacecraft around an asteroid.
@@ -215,8 +217,7 @@ def simulate_trajectory(
     taylor_integrator.state[3:6] = init_vel
     taylor_integrator.time = 0.0
 
-    propagation_days = 1.0
-    time_grid = np.linspace(0.0, propagation_days * pk.DAY2SEC / unit_time, 1000)
+    time_grid = np.linspace(0.0, propagation_days * pk.DAY2SEC / unit_time, n)
     trajectory = taylor_integrator.propagate_grid(time_grid)
 
     return trajectory[5], _rotate_states(time_grid, trajectory[5], rotation_vector)
