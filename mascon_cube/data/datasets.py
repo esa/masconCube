@@ -1,5 +1,4 @@
 from pathlib import Path
-from time import time
 from typing import Union
 
 import torch
@@ -95,12 +94,11 @@ def create_trajectory_dataset(
         0
     ]  # In case the asteroid name has extra info
     ground_truth = MasconModel(asteroid, device="cpu")
-    timestamp = int(time())
     assert isinstance(
         starting_orb_params, tuple
     ), "starting_orb_params must be a tuple of tuples"
     dataset_name = (
-        f"{asteroid_name}_trajectory_{len(starting_orb_params)}_{n}_{timestamp}.pt"
+        f"{asteroid_name}_traj_{len(starting_orb_params)}_{n}_{propagation_days}.pt"
     )
     dataset_path = TRAIN_DATASETS_DIR / dataset_name
     positions = []

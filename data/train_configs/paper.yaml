@@ -1,0 +1,47 @@
+# Training configuration for the paper experiments
+
+asteroids:
+- bennu: 
+  train: bennu_10000_spherical_0.0_2.0_42.pt
+  val: bennu_1000_spherical_0_2.pt
+- eros_2: 
+  train: eros_2_10000_spherical_0.0_2.0_42.pt
+  val: eros_2_1000_spherical_0_2.pt
+- eros_3: 
+  train: eros_3_10000_spherical_0.0_2.0_42.pt
+  val: eros_3_1000_spherical_0_2.pt
+- eros_uniform: 
+  train: eros_uniform_10000_spherical_0.0_2.0_42.pt
+  val: eros_uniform_1000_spherical_0_2.pt
+- itokawa: 
+  train: itokawa_10000_spherical_0.0_2.0_42.pt
+  val: itokawa_1000_spherical_0_2.pt
+- itokawa_cos: 
+  train: itokawa_cos_10000_spherical_0.0_2.0_42.pt
+  val: itokawa_cos_1000_spherical_0_2.pt
+- planetesimal: 
+  train: planetesimal_10000_spherical_0.0_2.0_42.pt
+  val: planetesimal_1000_spherical_0_2.pt
+- planetesimal_decentered: 
+  train: planetesimal_decentered_10000_spherical_0.0_2.0_42.pt
+  val: planetesimal_decentered_1000_spherical_0_2.pt
+- planetesimal_uniform: 
+  train: planetesimal_uniform_10000_spherical_0.0_2.0_42.pt
+  val: planetesimal_uniform_1000_spherical_0_2.pt
+
+train:
+  n_epochs: 1000
+  batch_size: 1000
+  loss_fn: normalized_l1_loss
+  lr: 1.0E-5
+  scheduler_factor: 0.8
+  scheduler_patience: 200
+  scheduler_min_lr: 1.0E-8
+  cube_side: 100
+  differential: False
+  normalize: True
+  activation_function: linear
+  data_from_trajectory: False
+
+val:
+  val_every_n_epochs: 50

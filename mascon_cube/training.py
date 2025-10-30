@@ -32,6 +32,8 @@ class AbstractTrainingConfig(ABC):
     scheduler_factor: float = 0.8
     scheduler_patience: int = 200
     scheduler_min_lr: float = 1e-8
+    val_set_path: Optional[Path] = None
+    val_every_n_epochs: int = 50
 
 
 @dataclass
@@ -43,27 +45,10 @@ class CubeTrainingConfig(AbstractTrainingConfig):
     normalize: bool = True
     activation_function: str = "linear"
     data_from_trajectory: bool = False
-    traj_start_orb_params: tuple[float, float, float, float, float, float] = (
-        1.5,
-        0.0,
-        np.pi / 2,
-        0.0,
-        0.0,
-        np.pi / 2,
-    )
-
-
-@dataclass
-class ValidationConfig:
-    """Dataclass for validation configuration"""
-
-    val_dataset: Optional[torch.Tensor] = None
-    val_every_n_epochs: int = 50
 
 
 def training_loop(
     config: CubeTrainingConfig,
-    val_config: Optional[ValidationConfig] = None,
     log_config: Optional[LogConfig] = None,
     device: Union[str, torch.device] = "cuda",
     progressbar: bool = False,
@@ -105,6 +90,10 @@ def training_loop(
 
     best_cube = deepcopy(cube)
     best_loss = float("inf")
+    if config.val_set_path is not None:
+        val_dataset = torch.load(config.val_set_path).to("cpu")
+    else:
+        val_dataset = None
 
     if log_config is not None:
         log_dir = (
@@ -132,20 +121,22 @@ def training_loop(
             predicted = compute_acceleration(target_points, cube.coords, cube.masses)
             loss = loss_fn(predicted, labels)
 
-            if val_config is None and loss.item() < best_loss:
+            if val_dataset is None and loss.item() < best_loss:
                 # If we don't have a validation set, we use the training loss to determine the best model
                 best_loss = loss.item()
                 best_cube = deepcopy(cube)
 
-            if val_config and i % val_config.val_every_n_epochs == 0:
+            if val_dataset is not None and i % config.val_every_n_epochs == 0:
                 # If we have a validation set, we use the validation loss to determine the best model
                 with torch.no_grad():
+                    val_dataset = val_dataset.to(device)
                     val_labels = compute_acceleration(
-                        val_config.val_dataset, ground_truth.coords, ground_truth.masses
+                        val_dataset, ground_truth.coords, ground_truth.masses
                     )
                     val_predicted = compute_acceleration(
-                        val_config.val_dataset, cube.coords, cube.masses
+                        val_dataset, cube.coords, cube.masses
                     )
+                    val_dataset = val_dataset.to("cpu")
                     val_loss = loss_fn(val_predicted, val_labels).item()
                     if val_loss < best_loss:
                         best_loss = val_loss
@@ -155,7 +146,7 @@ def training_loop(
             if log_config is not None:
                 if i % log_config.log_every_n_epochs == 0:
                     writer.add_scalar("Loss/train", loss.item(), i)
-                if val_config is not None and i % val_config.val_every_n_epochs == 0:
+                if val_dataset is not None and i % config.val_every_n_epochs == 0:
                     writer.add_scalar("Loss/val", val_loss, i)
                 if i % log_config.draw_every_n_epochs == 0:
                     fig = plot_mascon_cube(cube)
@@ -184,7 +175,6 @@ def training_from_trajectory(
         0.0,
         np.pi / 2,
     ),
-    val_config: Optional[ValidationConfig] = None,
     log_config: Optional[LogConfig] = None,
     device: Union[str, torch.device] = "cuda",
     progressbar: bool = False,
@@ -231,6 +221,10 @@ def training_from_trajectory(
 
     best_cube = deepcopy(cube)
     best_loss = float("inf")
+    if config.val_set_path is not None:
+        val_dataset = torch.load(config.val_set_path).to("cpu")
+    else:
+        val_dataset = None
 
     if log_config is not None:
         log_dir = (
@@ -258,20 +252,22 @@ def training_from_trajectory(
             predicted = compute_acceleration(target_points, cube.coords, cube.masses)
             loss = loss_fn(predicted, labels)
 
-            if val_config is None and loss.item() < best_loss:
+            if val_dataset is None and loss.item() < best_loss:
                 # If we don't have a validation set, we use the training loss to determine the best model
                 best_loss = loss.item()
                 best_cube = deepcopy(cube)
 
-            if val_config and i % val_config.val_every_n_epochs == 0:
+            if val_dataset is not None and i % config.val_every_n_epochs == 0:
                 # If we have a validation set, we use the validation loss to determine the best model
                 with torch.no_grad():
+                    val_dataset = val_dataset.to(device)
                     val_labels = compute_acceleration(
-                        val_config.val_dataset, ground_truth.coords, ground_truth.masses
+                        val_dataset, ground_truth.coords, ground_truth.masses
                     )
                     val_predicted = compute_acceleration(
-                        val_config.val_dataset, cube.coords, cube.masses
+                        val_dataset, cube.coords, cube.masses
                     )
+                    val_dataset = val_dataset.to("cpu")
                     val_loss = loss_fn(val_predicted, val_labels).item()
                     if val_loss < best_loss:
                         best_loss = val_loss
@@ -281,7 +277,7 @@ def training_from_trajectory(
             if log_config is not None:
                 if i % log_config.log_every_n_epochs == 0:
                     writer.add_scalar("Loss/train", loss.item(), i)
-                if val_config is not None and i % val_config.val_every_n_epochs == 0:
+                if val_dataset is not None and i % config.val_every_n_epochs == 0:
                     writer.add_scalar("Loss/val", val_loss, i)
                 if i % log_config.draw_every_n_epochs == 0:
                     fig = plot_mascon_cube(cube)
