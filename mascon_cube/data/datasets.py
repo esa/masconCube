@@ -90,9 +90,6 @@ def create_trajectory_dataset(
         Path: Path to the saved dataset.
     """
     asteroid_name = asteroid if isinstance(asteroid, str) else asteroid.stem
-    asteroid_name = asteroid_name.split("_")[
-        0
-    ]  # In case the asteroid name has extra info
     ground_truth = MasconModel(asteroid, device="cpu")
     assert isinstance(
         starting_orb_params, tuple
@@ -103,9 +100,8 @@ def create_trajectory_dataset(
     dataset_path = TRAIN_DATASETS_DIR / dataset_name
     positions = []
     for params in starting_orb_params:
-        print(params)
         body_frame_traj, _ = simulate_trajectory(
-            asteroid_name,
+            asteroid_name.split("_")[0],
             ground_truth.coords.numpy(),
             ground_truth.masses.numpy(),
             safety_coefficient,

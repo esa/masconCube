@@ -7,6 +7,7 @@ from matplotlib.colors import LogNorm
 from torch import Tensor
 
 from mascon_cube.constants import GROUND_TRUTH_DIR
+from mascon_cube.data.datasets import AccelerationDataset
 from mascon_cube.models import MasconCube
 
 
@@ -196,6 +197,38 @@ def plot_mascon_cube(
         return fig, range
     else:
         return fig
+
+
+def mascon_cube_to_point_cloud(
+    mascon_cube: MasconCube,
+    cmap: str = "viridis",
+    range: Optional[tuple[float, float]] = None,
+) -> np.ndarray:
+    """
+    Convert the mascon cube to a point cloud numpy array of shape (N, 6): [[x, y, z, r, g, b], ...]
+    where r, g, b are values in the range [0, 255] representing the mass color in the given colormap.
+
+    Args:
+        mascon_cube (MasconCube): The mascon cube to convert.
+        cmap (str, optional): The colormap to use for coloring the points. Defaults to "viridis".
+        range (Optional[tuple[float, float]], optional): The range of the colormap. Defaults to None.
+
+    Returns:
+        np.ndarray: The point cloud numpy array.
+    """
+    coords = mascon_cube.coords.detach().cpu().numpy()
+    masses = mascon_cube.masses.detach().cpu().numpy()
+    colormap = plt.get_cmap(cmap)
+    if range is None:
+        range = (0, np.percentile(masses, 99))
+    # clip masses to the range
+    masses_clipped = np.clip(masses, range[0], range[1])
+    colors = colormap((masses_clipped - range[0]) / (range[1] - range[0]))[
+        :, 0, :3
+    ]  # drop alpha channel
+    colors = (colors * 255).astype(np.uint8)
+    point_cloud = np.hstack((coords, colors))
+    return point_cloud
 
 
 def stokes_degree_error(
@@ -417,4 +450,33 @@ def plot_trajectory(
         ax0, rotated_trajectory, 45, 45, D, "Inertial frame", ticks=["x", "y", "z"]
     )
 
+    return fig
+
+
+def plot_dataset(
+    ds: AccelerationDataset,
+    cube: MasconCube,
+) -> plt.figure:
+    fig = plt.figure(figsize=(5, 5), dpi=300)
+    ax = fig.add_subplot(111, projection="3d", aspect="equal")
+    ax.scatter3D(
+        cube.coords[:, 0].cpu().numpy(),
+        cube.coords[:, 1].cpu().numpy(),
+        cube.coords[:, 2].cpu().numpy(),
+        c="k",
+        s=2,
+        alpha=0.05,
+    )
+    ax.scatter3D(
+        ds.data[:, 0],
+        ds.data[:, 1],
+        ds.data[:, 2],
+        c="b",
+        s=1,
+        alpha=0.9,
+    )
+    ax.view_init(45, 45)
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
+    ax.set_zlabel(r"$z$")
     return fig

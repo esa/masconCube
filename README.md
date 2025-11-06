@@ -17,13 +17,6 @@ conda env create -f environment.yml
 conda activate masconcube
 ```
 
-Or, if you want to install also development dependencies:
-
-```bash
-conda env create -f environment_dev.yml
-conda activate masconcube
-```
-
 Development dependencies include packages for linting and contributing to the project.
 
 ## Reprouducing the results from the paper

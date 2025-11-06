@@ -3,8 +3,8 @@ from pathlib import Path
 
 import yaml
 
-from mascon_cube.constants import CONFIGS_DIR, TRAIN_DATASETS_DIR
-from mascon_cube.training import CubeTrainingConfig
+from mascon_cube.constants import CONFIGS_DIR, TRAIN_DATASETS_DIR, VAL_DATASETS_DIR
+from mascon_cube.training import CubeTrainingConfig, training_loop
 
 
 def load_config(config_path: Path) -> list[CubeTrainingConfig]:
@@ -19,11 +19,12 @@ def load_config(config_path: Path) -> list[CubeTrainingConfig]:
     configs = []
     with open(config_path, "r") as file:
         config = yaml.safe_load(file)
-    for ast, ds in config.asteroid.items():
+    for ast, ds in config["asteroids"].items():
         configs.append(
             CubeTrainingConfig(
                 asteroid=ast,
                 train_set_path=TRAIN_DATASETS_DIR / ds["train"],
+                val_set_path=VAL_DATASETS_DIR / ds["val"],
                 **{k: v for k, v in config["train"].items()},
             )
         )
@@ -33,7 +34,7 @@ def load_config(config_path: Path) -> list[CubeTrainingConfig]:
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument(
-        "config-name",
+        "config_name",
         type=str,
         help="Name of the YAML configuration file. It must be located in mascon_cube/data/train_configs",
     )
@@ -46,5 +47,5 @@ if __name__ == "__main__":
     config_path = CONFIGS_DIR / config_name
     configs = load_config(config_path)
     for cfg in configs:
-        pass
-    # TODO
+        print(cfg)
+        training_loop(cfg, progressbar=True, use_wandb=True)

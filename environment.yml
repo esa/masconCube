@@ -15,6 +15,12 @@ dependencies:
   - torchquad ~= 0.4.1
   - pyvista ~= 0.45.2
   - pykep ~= 2.6.4
+  - pydantic ~= 2.12.3
+    # dev
+  - pre-commit ~= 4.1.0
+  - ipykernel ~= 6.29.5
+  - tensorboard ~= 2.19.0
+  - nbformat ~= 5.10.4
 
   - pip:
     - tetgen == 0.6.4
@@ -22,4 +28,7 @@ dependencies:
     - torch
     - torchvision
     - torchaudio
+    - sobol_seq
+    - pyvistaqt
+    - wandb
     - --extra-index-url https://download.pytorch.org/whl/cu118
