@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -25,6 +26,10 @@ class AbstractTrainingConfig(ABC):
     asteroid: str
     train_set_path: Path
     val_set_path: Path
+    starting_training_data: int = -1
+    add_data_every_n_epochs: int = 0
+    data_to_add: int = 0
+    warmup_epochs: int = 0
     n_epochs: int = 10
     batch_size: int = 1000
     loss_fn: str = "normalized_l1_loss"
@@ -83,14 +88,21 @@ def training_loop(
     )
     ground_truth = MasconModel(config.asteroid, device=device)
     optimizer = torch.optim.Adam([cube.weights], lr=config.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+
+    def lr_lambda(i):
+        return min(1.0, i / config.warmup_epochs)
+
+    warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         factor=config.scheduler_factor,
         patience=config.scheduler_patience,
         min_lr=config.scheduler_min_lr,
     )
 
-    training_data = AccelerationDataset(config.train_set_path)
+    training_data = AccelerationDataset(
+        config.train_set_path, config.starting_training_data
+    )
     if wandb_run is not None:
         sns.set_theme()
         sns.set_style("whitegrid")
@@ -137,14 +149,23 @@ def training_loop(
             wandb_run.log({"cube": wandb.Object3D(point_cloud), "epoch": i})
             # fig = plot_mascon_cube(cube, range=(0, MASS_VMAX[config.asteroid]))
             # wandb_run.log({"Cube": wandb.Image(fig), "epoch": i})
-
-        scheduler.step(val_loss)
+        if i < config.warmup_epochs:
+            warmup_scheduler.step()
+        else:
+            plateau_scheduler.step(val_loss)
         if wandb_run is not None:
             wandb_run.log({"lr": optimizer.param_groups[0]["lr"], "epoch": i})
+        if (
+            config.add_data_every_n_epochs > 0
+            and (i + 1) % config.add_data_every_n_epochs == 0
+        ):
+            training_data.add_data(config.data_to_add)
 
     if wandb_run is not None:
         wandb_run.finish()
 
+    if training_data.n != len(training_data.data):
+        warnings.warn("Training data was not fully used during training.")
     return best_cube
 
 

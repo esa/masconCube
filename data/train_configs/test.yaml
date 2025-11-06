@@ -30,7 +30,7 @@ asteroids:
   #   val: planetesimal_uniform_1000_spherical_0_2.pt
 
 train:
-  n_epochs: 33
+  n_epochs: 100
   batch_size: 1000
   loss_fn: normalized_l1_loss
   lr: 1.0E-5
@@ -43,3 +43,7 @@ train:
   activation_function: linear
   data_from_trajectory: False
   batch_persistency: 3
+  starting_training_data: 2000
+  add_data_every_n_epochs: 5
+  data_to_add: 1000
+  warmup_epochs: 10

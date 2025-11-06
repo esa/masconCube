@@ -15,16 +15,30 @@ class AccelerationDataset(Dataset):
     def __init__(
         self,
         path: Union[str, Path],
+        n: int = -1,
     ):
+        """Dataset for acceleration data.
+        Args:
+            path (Union[str, Path]): Path to the dataset file.
+            n (int, optional): Number of samples to use from the dataset at the beginning.
+                If -1, use the entire dataset. Defaults to -1.
+        """
         data = torch.load(path)
         self.data = data
-        self.n = len(self.data)
+        assert n <= len(self.data), "n cannot be greater than the dataset size"
+        self.n = n if n > 0 else len(self.data)
 
     def __len__(self):
         return self.n
 
     def __getitem__(self, idx):
         return self.data[idx][:3], self.data[idx][3:]
+
+    def add_data(self, n: int) -> int:
+        remaining = len(self.data) - self.n
+        to_add = min(n, remaining)
+        self.n += to_add
+        return to_add
 
 
 def create_random_dataset(
