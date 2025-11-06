@@ -50,7 +50,6 @@ class CubeTrainingConfig(AbstractTrainingConfig):
     differential: bool = False
     normalize: bool = True
     activation_function: str = "linear"
-    data_from_trajectory: bool = False
 
 
 def training_loop(
@@ -90,7 +89,10 @@ def training_loop(
     optimizer = torch.optim.Adam([cube.weights], lr=config.lr)
 
     def lr_lambda(i):
-        return min(1.0, i / config.warmup_epochs)
+        if config.warmup_epochs == 0:
+            return 1.0
+        else:
+            return min(1.0, i / config.warmup_epochs)
 
     warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
     plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
