@@ -38,6 +38,12 @@ if __name__ == "__main__":
         type=str,
         help="Name of the YAML configuration file. It must be located in mascon_cube/data/train_configs",
     )
+    parser.add_argument(
+        "--use-wandb",
+        "-w",
+        action="store_true",
+        help="Use Weights & Biases for logging",
+    )
     args = parser.parse_args()
     config_name = (
         args.config_name
@@ -48,4 +54,4 @@ if __name__ == "__main__":
     configs = load_config(config_path)
     for cfg in configs:
         print(cfg)
-        training_loop(cfg, progressbar=True, use_wandb=True)
+        training_loop(cfg, progressbar=True, use_wandb=args.use_wandb)

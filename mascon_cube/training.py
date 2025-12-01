@@ -35,7 +35,7 @@ class AbstractTrainingConfig(ABC):
     loss_fn: str = "normalized_l1_loss"
     lr: float = 1e-5
     scheduler_factor: float = 0.8
-    scheduler_patience: int = 200
+    scheduler_patience: int = 2
     scheduler_min_lr: float = 1e-8
     val_set_path: Optional[Path] = None
     val_every_n_epochs: int = 50

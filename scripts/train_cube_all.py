@@ -42,7 +42,7 @@ def main(gpus: list[int]):
 
             tqdm.write(f"[GPU {gpu_id}] Starting: {asteroid}")
             env = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-            train_script = Path(__file__).parent / "train.py"
+            train_script = Path(__file__).parent / "train_cube.py"
             process = subprocess.Popen(
                 [
                     conda_path,

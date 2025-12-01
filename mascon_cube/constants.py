@@ -8,7 +8,6 @@ TRAIN_DATASETS_DIR = DATA_DIR / "train_datasets"
 VAL_DATASETS_DIR = DATA_DIR / "val_datasets"
 TEST_DATASETS_DIR = DATA_DIR / "test_datasets"
 OUTPUT_DIR = DATA_DIR / "output"
-TENSORBOARD_DIR = ROOT_DIR / "tensorboard_logs"
 CONFIGS_DIR = DATA_DIR / "train_configs"
 
 
