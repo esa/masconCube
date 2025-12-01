@@ -2,6 +2,8 @@ data/3dmeshes/*.pk
 data/ground_truths/**/*
 data/output/*.pt
 data/output/**/*
+data/train_datasets/*.pt
 *.egg-info
 tensorboard_logs
 **/__pycache__
+wandb

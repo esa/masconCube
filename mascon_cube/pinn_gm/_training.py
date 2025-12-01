@@ -1,23 +1,23 @@
 from copy import deepcopy
-from dataclasses import asdict
-from datetime import datetime
+from dataclasses import dataclass
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
 from mascon_cube import geodesynet
-from mascon_cube.constants import TENSORBOARD_DIR
 from mascon_cube.data.mascon_model import MasconModel
 from mascon_cube.data.sampling import get_target_point_sampler
-from mascon_cube.logs import LogConfig, SummaryWriter
-from mascon_cube.pinn_gm import PinnGM, pinn_loss
-from mascon_cube.training import AbstractTrainingConfig, ValidationConfig
+from mascon_cube.pinn_gm._network import PinnGM
+from mascon_cube.pinn_gm._utils import pinn_loss
 
 
-class PinnTrainingConfig(AbstractTrainingConfig):
+@dataclass
+class PinnTrainingConfig:
     """Dataclass for training configuration for PINN models"""
 
+    asteroid: str
+    val_set_path: str
     n_epochs: int = 8192
     batch_size: int = 2048
     n_data: int = 100000
@@ -25,12 +25,11 @@ class PinnTrainingConfig(AbstractTrainingConfig):
     sampling_min: float = 0.0
     sampling_max: float = 2.4
     lr: float = 0.00390625
+    val_every_n_epochs: int = 50
 
 
 def training_loop(
     config: PinnTrainingConfig,
-    val_config: ValidationConfig | None = None,
-    log_config: LogConfig | None = None,
     device: str | torch.device = "cuda",
     progressbar: bool = True,
 ) -> PinnGM:
@@ -48,7 +47,7 @@ def training_loop(
     mascon_points = mascon_model.coords
     mascon_masses = mascon_model.masses
     ground_truth = geodesynet.ACC_L(dataset, mascon_points, mascon_masses).to(device)
-    val_dataset = val_config.val_dataset.requires_grad_(True) if val_config else None
+    val_dataset = torch.load(config.val_set_path).to(device).requires_grad_(True)
     val_labels = (
         geodesynet.ACC_L(val_dataset, mascon_points, mascon_masses)
         .requires_grad_(True)
@@ -58,14 +57,6 @@ def training_loop(
     # And init the best results
     best_loss = np.inf
     best_model = None
-
-    if log_config is not None:
-        log_dir = (
-            TENSORBOARD_DIR
-            / config.asteroid
-            / datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        )
-        writer = SummaryWriter(log_dir=log_dir)
 
     iterator = tqdm(range(config.n_epochs)) if progressbar else range(config.n_epochs)
 
@@ -92,16 +83,12 @@ def training_loop(
             # labels = geodesynet.ACC_L(batch, mascon_points, mascon_masses).to(device)
             # Compute the loss
             loss = loss_fn(predicted, labels)
-            if val_config is None and loss.item() < best_loss:
-                # If we don't have a validation set, we use the training loss to determine the best model
-                best_loss = loss.item()
-                best_model = deepcopy(model).cpu()
             # Backpropagate
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        if val_config and i % val_config.val_every_n_epochs == 0:
+        if config.val_every_n_epochs == 0:
             # If we have a validation set, we use the validation loss to determine the best model
             val_predicted = model(val_dataset)
             val_predicted = torch.autograd.grad(
@@ -115,18 +102,4 @@ def training_loop(
                 best_loss = val_loss
                 best_model = deepcopy(model).cpu()
             optimizer.zero_grad()
-
-        # Tensorboard logging
-        if log_config is not None:
-            if i % log_config.log_every_n_epochs == 0:
-                writer.add_scalar("Loss/train", loss.item(), i)
-            if val_config is not None and i % val_config.val_every_n_epochs == 0:
-                writer.add_scalar("Loss/val", val_loss, i)
-
-    if log_config is not None:
-        writer.add_hparams(asdict(config), {"best_loss": best_loss})
-
-        torch.save(best_model.state_dict(), log_dir / "best_model_state_dict.pt")
-        writer.close()
-
     return best_model

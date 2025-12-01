@@ -17,61 +17,81 @@ conda env create -f environment.yml
 conda activate masconcube
 ```
 
-Or, if you want to install also development dependencies:
+## Project structure
 
-```bash
-conda env create -f environment_dev.yml
-conda activate masconcube
+```
+masconCube/
+├── data/                           # Data folder
+│   ├── 3dmeshes/                   # 3D meshes (to be downloaded from darioizzo/geodesyNets)
+│   ├── ground_truths/              # Ground-truth mascon models (to be generated with scripts/generate_ground_truth.py)
+│   ├── output/                     # Output folder for trained models and results
+|   ├── train_configs/              # Training configurations for MasconCube (yaml files)
+|   ├── train_datasets/             # Training datasets (to be generated with scripts/generate_train_datasets.py)
+|   ├── val_datasets/               # Validation datasets (to be generated with scripts/generate_val_datasets.py)
+|   └── test_datasets/              # Test datasets (to be generated with scripts/generate_val_datasets.py)
+├── mascon_cube/                    # Main package
+│   ├── data/                       # Data loading and processing
+|   ├── geodesynet/                 # GeodesyNets original implementation, mostly unmodified
+|   ├── pinn_gm/                    # PINN-GM III original implementation, mostly unmodified
+│   ├── contstants.py               
+│   ├── losses.py                   
+│   ├── metrics.py
+│   ├── models.py
+│   ├── training.py
+│   ├── trajectory.py
+│   ├── utils.py
+│   └── visualization.py
+├── notebooks/                      # Jupyter notebooks                 
+├── scripts/                        # Scripts for data generation, training, and evaluation
+└── environment.yml                 # Conda environment file
 ```
 
-Development dependencies include packages for linting and contributing to the project.
+## Data
 
-## Reprouducing the results from the paper
+Data is not stored in this repository to keep the size of the repository small. You can populate the `data` folder by following these steps:
 
  1. Download the 3D meshes from [darioizzo/geodesyNets/3dmeshes]([darioizzo/geodesyNets/3dmeshes](https://github.com/darioizzo/geodesyNets/tree/1edbb64d1e8e355e124a41eac27a14d7c5c5d881/3dmeshes)) and copy them inside the `data/3dmeshes` folder. For more information, see the [data README](data/README.md).
  2. Generate the ground-truth mascon models in the `data/ground_truths` folder by running the following script:
     ```bash
     python scripts/generate_ground_truth.py
     ```
-3. Generate the validation datasets in the `data/val_datasets` and `data/test_datasets` folders by running the following script:
+ 3. Generate the training datasets using in the paper in the `data/train_datasets` folders by running the following script:
+    ```bash
+    python scripts/generate_train_datasets.py random
+    ```
+ 4. Generate the validation datasets in the `data/val_datasets` and `data/test_datasets` folders by running the following script:
     ```bash
     python scripts/generate_val_datasets.py
     ```
-4. Train MasconCubes with the following command:
-    ```bash
-    python scripts/train_cubes_all.py [--gpus <gpu1> <gpu2> ...]
-    ```
-5. Train GeodesyNets with the following command:
-    ```bash
-    python scripts/train_geodesynet_all.py [--gpus <gpu1> <gpu2> ...]
-    ```
-6. Train PINN-GM III with the following command:
-    ```bash
-    python scripts/train_pinn_all.py [--gpus <gpu1> <gpu2> ...]
-    ```
-7. Evaluate the models and produce plots using the provided notebooks.
 
-Note that steps 5 and 6 are required only to compare the results with previous state-of-the-art methods, and they might take a long time to run. You can skip them if you are only interested in MasconCube. If you want to run them, multiple GPUs are recommended, so that you can run them in parallel. The `--gpus` argument allows you to specify which GPUs to use for training.
+## Training MasconCube and other models (legacy method)
 
-### Training on single asteroids
-
-If you want to run the training on single asteroids, you can use the scripts `scripts/train.py`, `scripts/train_geodesynet.py`, and `scripts/train_pinn.py`. For example, to train MasconCube on `eros_uniform`, you can run:
-
+MasconCube, GeodesyNet and PINN-GM III can be trained using their respective training scripts in the `scripts` folder: `train_cube.py`, `train_geodesynet.py`, and `train_pinn.py`.
+The cli interface for all the training scripts is similar:
 ```bash
-python scripts/train.py eros_uniform
+python scripts/train_<model>.py <asteroid_name>
 ```
 
-MasconCube trainings also support TensorBoard logging (development dependencies required). You can run the following command to start TensorBoard:
-
+It is also possible to train a model for every asteroid in `data/ground_truths` on multiple GPUs using the scripts `train_cubes_all.py`, `train_geodesynet_all.py`, and `train_pinn_all.py`.
+Again, the cli interface is similar for all the scripts:
 ```bash
-tensorboard --logdir runs
+python scripts/train_<model>_all.py [--gpus <gpu1> <gpu2> ...]
 ```
 
-And then enable logging in the training script by passing the `--tensorboard` argument:
+Default settings should replicate the results in the paper. However some small implemention details could lead to slightly different results. If you want to replicate exactly the results of the paper checkout [v1.0.0](https://github.com/esa/masconCube/tree/v.1.0.0).
 
+## Training MasconCube (new method)
+
+The recommended way to train MasconCube models is with yaml configuration files stored in the `data/train_configs` folder.
+The folder alredy contains a configuration file called `paper.yaml` that you can use as a starting point.
+It use similar settings to the one used in the paper, but for an exact comparison follow the instructions in the previous section.
+
+To train a MasconCube model using a configuration file, run the following command:
 ```bash
-python scripts/train.py eros_uniform --tensorboard
+python scripts/run_config.py data/train_configs/<config_file>.yaml [--use-wandb]
 ```
+
+The `--use-wandb` flag is optional, and it enables logging with [Weights & Biases](https://wandb.ai/).
 
 ## License
 The code is released under the [Apache 2.0 license](https://github.com/esa/masconCube?tab=Apache-2.0-1-ov-file).

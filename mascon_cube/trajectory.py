@@ -77,6 +77,13 @@ def build_initial_conditions(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Builds initial conditions in the rotating frame.
+    Args:
+        keplerian_params (np.ndarray): Keplerian parameters [a, e, i, W, w, E]
+        angular_velocity (np.ndarray): Angular velocity vector of the rotating frame
+        gravitational_param (float): Gravitational parameter of the central body
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Position and velocity vectors in the rotating frame
+
     """
     pos_inertial, vel_inertial = pk.par2ic(keplerian_params, gravitational_param)
     vel_inertial = np.array(vel_inertial)
@@ -104,6 +111,16 @@ def simulate_trajectory(
     mascon_masses: np.ndarray,
     safety_coefficient: float = 1.4,
     exit_radius: float = 2.0,
+    starting_orb_params: tuple[float, float, float, float, float, float] = (
+        1.5,
+        0.0,
+        np.pi / 2,
+        0.0,
+        0.0,
+        np.pi / 2,
+    ),
+    n: int = 1000,
+    propagation_days: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Simulates the trajectory of a spacecraft around an asteroid.
@@ -195,15 +212,12 @@ def simulate_trajectory(
         t_events=[ellipsoid_entry, sphere_exit],
     )
 
-    deployment_sma = 1.5
-    keplerian_params = [deployment_sma, 0.0, np.pi / 2, 0.0, 0.0, np.pi / 2]
-    init_pos, init_vel = build_initial_conditions(keplerian_params, rotation_vector)
+    init_pos, init_vel = build_initial_conditions(starting_orb_params, rotation_vector)
     taylor_integrator.state[:3] = init_pos
     taylor_integrator.state[3:6] = init_vel
     taylor_integrator.time = 0.0
 
-    propagation_days = 1.0
-    time_grid = np.linspace(0.0, propagation_days * pk.DAY2SEC / unit_time, 1000)
+    time_grid = np.linspace(0.0, propagation_days * pk.DAY2SEC / unit_time, n)
     trajectory = taylor_integrator.propagate_grid(time_grid)
 
     return trajectory[5], _rotate_states(time_grid, trajectory[5], rotation_vector)

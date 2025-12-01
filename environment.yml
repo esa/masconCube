@@ -10,11 +10,17 @@ dependencies:
   - numpy ~= 1.26.4  # numpy 2 is not compatible with cascade
   - cascade ~= 0.1.9
   - lazy_import ~= 0.2.2
-  - scipy ~= 0.15.2
+  - scipy ~= 1.16.3
   - seaborn ~= 0.13.2
   - torchquad ~= 0.4.1
   - pyvista ~= 0.45.2
   - pykep ~= 2.6.4
+  - pydantic ~= 2.12.3
+  - tqdm
+    # dev
+  - pre-commit ~= 4.1.0
+  - ipykernel ~= 6.29.5
+  - nbformat ~= 5.10.4
 
   - pip:
     - tetgen == 0.6.4
@@ -22,4 +28,7 @@ dependencies:
     - torch
     - torchvision
     - torchaudio
+    - sobol_seq
+    - pyvistaqt
+    - wandb
     - --extra-index-url https://download.pytorch.org/whl/cu118
